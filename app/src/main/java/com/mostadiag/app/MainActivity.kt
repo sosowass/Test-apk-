@@ -36,7 +36,7 @@ class MainActivity : Activity() {
             setBackgroundColor(bg)
         }
         val heading = TextView(this).apply {
-            text = "R  /  RACHID DIAGNOSTIC"
+            text = "B  /  BILAL27000DIAG"
             textSize = 23f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(Color.WHITE)
@@ -95,13 +95,39 @@ class MainActivity : Activity() {
             })
             content.addView(item, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
         }
+        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val dashboard = content
+        fun tab(name: String, onTap: () -> Unit) {
+            tabs.addView(TextView(this).apply {
+                text = name
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setTextColor(accent)
+                setBackgroundColor(panel)
+                setPadding(8, 16, 8, 16)
+                setOnClickListener { onTap() }
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = 4 })
+        }
+        root.addView(tabs, 2)
+        tab("ACCUEIL") { scroll.scrollTo(0, 0) }
+        tab("VÉHICULE") { scroll.post { scroll.smoothScrollTo(0, 200) } }
+        tab("MESURES") { scroll.post { scroll.smoothScrollTo(0, 500) } }
+        tab("RAPPORT") { scroll.post { scroll.smoothScrollTo(0, content.height) } }
         section("CONNEXION")
         action("◈  Connecter le véhicule", "Associer un adaptateur ELM327 Bluetooth Classic") { connect() }
+        section("VÉHICULE MULTIMARQUE")
+        action("▣  Identification véhicule", "VIN • marque • modèle • motorisation (lecture VIN si prise en charge)") { execute("0902", "Identification VIN (réponse brute)") }
+        action("◎  Protocole OBD", "Identifier le protocole utilisé par l'interface") { execute("ATDP", "Protocole actif") }
         section("DIAGNOSTIC")
         action("⌁  Codes défauts", "Lecture des réponses DTC du calculateur") { execute("03", "Codes défauts (réponse brute)") }
         action("◉  Régime moteur", "Mesure instantanée • tr/min") { execute("010C", "Régime moteur") }
         action("➤  Vitesse", "Vitesse du véhicule • km/h") { execute("010D", "Vitesse") }
         action("◌  Température moteur", "Liquide de refroidissement • °C") { execute("0105", "Température moteur") }
+        section("MESURES AVANCÉES")
+        action("◈  Charge moteur", "PID 0104 • réponse brute") { execute("0104", "Charge moteur") }
+        action("◈  Pression admission", "PID 010B • réponse brute") { execute("010B", "Pression admission") }
+        action("◈  Position accélérateur", "PID 0111 • réponse brute") { execute("0111", "Position papillon") }
+        action("◈  Tension module", "PID 0142 • réponse brute") { execute("0142", "Tension module") }
         section("MAINTENANCE")
         action("⚠  Effacer les défauts", "Action sensible • confirmation obligatoire") {
             AlertDialog.Builder(this).setTitle("Confirmer l'effacement")
@@ -109,7 +135,7 @@ class MainActivity : Activity() {
                 .setNegativeButton("Annuler", null)
                 .setPositiveButton("Effacer") { _, _ -> execute("04", "Effacement") }.show()
         }
-        section("JOURNAL DE DIAGNOSTIC")
+        section("RAPPORT • JOURNAL DE DIAGNOSTIC")
         results = TextView(this).apply {
             text = "Prêt pour le diagnostic. Connectez un boîtier ELM327 Bluetooth Classic déjà associé au téléphone."
             textSize = 14f
