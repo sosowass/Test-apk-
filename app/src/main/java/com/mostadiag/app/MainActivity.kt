@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.view.Gravity
 import android.widget.*
 import java.io.InputStream
@@ -24,127 +26,200 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var results: TextView
     private val blue = Color.rgb(0, 153, 255)
+    private var selectedTab = 0
+    private lateinit var content: LinearLayout
+    private lateinit var scroll: ScrollView
+    private lateinit var nav: LinearLayout
+    private val bg = Color.rgb(5, 12, 26)
+    private val panel = Color.rgb(16, 29, 51)
+    private val cyan = Color.rgb(40, 205, 248)
     private val adapter by lazy { (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter }
+    private fun rounded(color: Int, stroke: Int = color, radius: Float = 22f): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radius
+            setStroke(2, stroke)
+        }
+
+    private fun text(value: String, size: Float, color: Int = Color.WHITE, bold: Boolean = false): TextView =
+        TextView(this).apply {
+            this.text = value
+            textSize = size
+            setTextColor(color)
+            if (bold) setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+
+    private fun tile(title: String, subtitle: String, color: Int, symbol: String, fn: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = rounded(panel, color, 25f)
+            setPadding(12, 20, 12, 20)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { fn() }
+            addView(text(symbol, 31f, color, true).apply { gravity = Gravity.CENTER })
+            addView(text(title, 15f, Color.WHITE, true).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, 12, 0, 5)
+            })
+            addView(text(subtitle, 11f, Color.rgb(166, 192, 213)).apply { gravity = Gravity.CENTER })
+        }
+
+    private fun addGrid(items: List<LinearLayout>) {
+        items.chunked(2).forEach { pair ->
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            pair.forEach { item ->
+                line.addView(item, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    setMargins(5, 5, 5, 5)
+                })
+            }
+            if (pair.size == 1) line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            content.addView(line)
+        }
+    }
+
+    private fun section(title: String) {
+        content.addView(text(title, 13f, cyan, true).apply {
+            letterSpacing = 0.11f
+            setPadding(10, 25, 10, 12)
+        })
+    }
+
+    private fun rowAction(title: String, detail: String, color: Int = cyan, action: () -> Unit) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 19, 20, 19)
+            background = rounded(panel, color, 22f)
+            isClickable = true
+            setOnClickListener { action() }
+        }
+        card.addView(text(title + "   ›", 17f, Color.WHITE, true))
+        card.addView(text(detail, 12f, Color.rgb(165, 189, 210)).apply { setPadding(0, 6, 0, 0) })
+        content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { setMargins(5, 5, 5, 7) })
+    }
+
+    private fun showTab(tab: Int) {
+        selectedTab = tab
+        content.removeAllViews()
+        for (i in 0 until nav.childCount) {
+            val button = nav.getChildAt(i) as TextView
+            button.setTextColor(if (i == tab) cyan else Color.rgb(155, 171, 194))
+        }
+        when (tab) {
+            0 -> {
+                section("TABLEAU DE BORD")
+                rowAction("◉  Connexion ELM327", "Bluetooth Classic • appuyer pour choisir le boîtier", Color.rgb(18, 220, 156)) { connect() }
+                section("DIAGNOSTIC RAPIDE")
+                addGrid(listOf(
+                    tile("Codes défauts", "Lecture DTC", Color.rgb(38, 144, 255), "⚙") { execute("03", "Codes défauts") },
+                    tile("Mesures directes", "Capteurs moteur", Color.rgb(255, 85, 76), "▥") { showTab(2) },
+                    tile("Identification", "VIN et protocole", Color.rgb(40, 221, 129), "▣") { showTab(1) },
+                    tile("Rapport", "Historique session", Color.rgb(255, 166, 45), "▤") { showTab(3) },
+                    tile("Régime moteur", "tr/min", Color.rgb(181, 89, 250), "◉") { execute("010C", "Régime moteur") },
+                    tile("Température", "°C", Color.rgb(255, 78, 82), "♨") { execute("0105", "Température moteur") }
+                ))
+                section("ÉTAT DE LA SESSION")
+                rowAction("Voir le journal", "Résultats et réponses du véhicule") { showTab(3) }
+            }
+            1 -> {
+                section("IDENTIFICATION MULTIMARQUE")
+                rowAction("Lire le VIN", "Mode OBD 09 PID 02 • selon compatibilité") { execute("0902", "VIN (réponse brute)") }
+                rowAction("Protocole du véhicule", "Interroger l'interface ELM327") { execute("ATDP", "Protocole actif") }
+                rowAction("Connexion Bluetooth", "Sélectionner un adaptateur déjà associé") { connect() }
+                section("COMPATIBILITÉ")
+                rowAction("Toutes marques OBD-II", "Fonctions génériques uniquement. L'accès ABS, airbag et constructeur nécessite des protocoles spécifiques.") {}
+            }
+            2 -> {
+                section("MESURES MOTEUR")
+                addGrid(listOf(
+                    tile("Régime", "PID 010C", Color.rgb(173, 94, 255), "◉") { execute("010C", "Régime") },
+                    tile("Vitesse", "PID 010D", Color.rgb(36, 160, 255), "➤") { execute("010D", "Vitesse") },
+                    tile("Température", "PID 0105", Color.rgb(255, 85, 85), "♨") { execute("0105", "Température") },
+                    tile("Charge", "PID 0104", Color.rgb(30, 218, 145), "▥") { execute("0104", "Charge moteur") },
+                    tile("Admission", "PID 010B", Color.rgb(255, 156, 55), "◎") { execute("010B", "Pression admission") },
+                    tile("Papillon", "PID 0111", Color.rgb(40, 212, 229), "◈") { execute("0111", "Papillon") },
+                    tile("Tension", "PID 0142", Color.rgb(36, 213, 195), "ϟ") { execute("0142", "Tension module") },
+                    tile("Défauts", "Mode 03", Color.rgb(255, 95, 70), "⚙") { execute("03", "Codes défauts") }
+                ))
+                section("INFORMATIONS")
+                rowAction("Valeurs en réponse brute", "Décodage et graphiques temps réel prévus pour une version ultérieure.") {}
+            }
+            3 -> {
+                section("RAPPORT DE DIAGNOSTIC")
+                content.addView(results.apply { (parent as? android.view.ViewGroup)?.removeView(this) },
+                    LinearLayout.LayoutParams(-1, -2).apply { setMargins(5, 5, 5, 12) })
+                rowAction("Partager le journal", "Exporter les résultats en texte vers une autre application") {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, results.text.toString())
+                    }
+                    startActivity(android.content.Intent.createChooser(send, "Partager le diagnostic"))
+                }
+                section("MAINTENANCE")
+                rowAction("Effacer les défauts", "Action sensible • confirmation obligatoire", Color.rgb(255, 98, 75)) {
+                    AlertDialog.Builder(this).setTitle("Confirmer l'effacement")
+                        .setMessage("Cette opération peut supprimer des données de diagnostic. À effectuer après réparation uniquement.")
+                        .setNegativeButton("Annuler", null)
+                        .setPositiveButton("Effacer") { _, _ -> execute("04", "Effacement") }.show()
+                }
+            }
+            else -> {
+                section("PARAMÈTRES")
+                rowAction("Adaptateur OBD2", "Bluetooth Classic • ELM327") { connect() }
+                rowAction("Version", "Bilal27000diag • Diagnostic OBD-II générique") {}
+                rowAction("Sécurité", "Ne pas utiliser l'application pendant la conduite.") {}
+            }
+        }
+        scroll.post { scroll.scrollTo(0, 0) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val bg = Color.rgb(7, 13, 25)
-        val panel = Color.rgb(19, 30, 49)
-        val accent = Color.rgb(36, 211, 231)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 30, 24, 16)
             setBackgroundColor(bg)
+            setPadding(12, 20, 12, 12)
         }
-        val heading = TextView(this).apply {
-            text = "B  /  BILAL27000DIAG"
-            textSize = 23f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            setPadding(4, 12, 4, 6)
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
-        root.addView(heading)
-        root.addView(TextView(this).apply {
-            text = "CENTRE DE CONTRÔLE  •  OBD-II"
-            textSize = 11f
-            letterSpacing = 0.18f
-            setTextColor(accent)
-            setPadding(4, 0, 4, 24)
-        })
-        status = TextView(this).apply {
-            text = "●  HORS LIGNE     |     ELM327"
-            textSize = 16f
-            setTextColor(accent)
-            setBackgroundColor(panel)
-            setPadding(20, 22, 20, 22)
+        header.addView(text("◈", 40f, cyan, true))
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 0, 0, 0) }
+        brand.addView(text("BILAL27000DIAG", 24f, Color.WHITE, true))
+        brand.addView(text("DIAGNOSTIC AUTO • OBD-II", 11f, cyan).apply { letterSpacing = 0.1f })
+        header.addView(brand)
+        root.addView(header)
+        status = text("●  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(27, 227, 158), true).apply {
+            background = rounded(panel, Color.rgb(27, 227, 158))
+            setPadding(19, 21, 19, 21)
+            setOnClickListener { connect() }
         }
-        root.addView(status, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 20 })
-        val scroll = ScrollView(this).apply { isFillViewport = false }
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(status, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 20, 3, 10) })
+        results = text("Journal prêt. Connectez un adaptateur ELM327 Bluetooth Classic déjà associé au téléphone.", 14f, Color.WHITE).apply {
+            background = rounded(panel)
+            setPadding(18, 18, 18, 18)
+        }
+        scroll = ScrollView(this).apply { isFillViewport = false }
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        fun section(title: String) {
-            content.addView(TextView(this).apply {
-                text = title
-                textSize = 12f
-                letterSpacing = 0.15f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(Color.rgb(151, 174, 199))
-                setPadding(4, 16, 4, 12)
-            })
+        nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = rounded(panel, Color.rgb(37, 74, 109))
+            setPadding(2, 10, 2, 10)
         }
-        fun action(title: String, subtitle: String, fn: () -> Unit) {
-            val item = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(panel)
-                setPadding(22, 18, 22, 18)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener { fn() }
-            }
-            item.addView(TextView(this).apply {
-                text = title
-                textSize = 18f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(Color.WHITE)
-            })
-            item.addView(TextView(this).apply {
-                text = subtitle
-                textSize = 13f
-                setTextColor(Color.rgb(160, 186, 207))
-                setPadding(0, 6, 0, 0)
-            })
-            content.addView(item, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
-        }
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val dashboard = content
-        fun tab(name: String, onTap: () -> Unit) {
-            tabs.addView(TextView(this).apply {
-                text = name
-                textSize = 12f
+        listOf("⌂\nAccueil", "▣\nVéhicule", "▥\nMesures", "▤\nRapport", "⚙\nRéglages").forEachIndexed { i, label ->
+            nav.addView(text(label, 11f).apply {
                 gravity = Gravity.CENTER
-                setTextColor(accent)
-                setBackgroundColor(panel)
-                setPadding(8, 16, 8, 16)
-                setOnClickListener { onTap() }
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = 4 })
+                setPadding(2, 7, 2, 7)
+                setOnClickListener { showTab(i) }
+            }, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        root.addView(tabs, 2)
-        tab("ACCUEIL") { scroll.scrollTo(0, 0) }
-        tab("VÉHICULE") { scroll.post { scroll.smoothScrollTo(0, 200) } }
-        tab("MESURES") { scroll.post { scroll.smoothScrollTo(0, 500) } }
-        tab("RAPPORT") { scroll.post { scroll.smoothScrollTo(0, content.height) } }
-        section("CONNEXION")
-        action("◈  Connecter le véhicule", "Associer un adaptateur ELM327 Bluetooth Classic") { connect() }
-        section("VÉHICULE MULTIMARQUE")
-        action("▣  Identification véhicule", "VIN • marque • modèle • motorisation (lecture VIN si prise en charge)") { execute("0902", "Identification VIN (réponse brute)") }
-        action("◎  Protocole OBD", "Identifier le protocole utilisé par l'interface") { execute("ATDP", "Protocole actif") }
-        section("DIAGNOSTIC")
-        action("⌁  Codes défauts", "Lecture des réponses DTC du calculateur") { execute("03", "Codes défauts (réponse brute)") }
-        action("◉  Régime moteur", "Mesure instantanée • tr/min") { execute("010C", "Régime moteur") }
-        action("➤  Vitesse", "Vitesse du véhicule • km/h") { execute("010D", "Vitesse") }
-        action("◌  Température moteur", "Liquide de refroidissement • °C") { execute("0105", "Température moteur") }
-        section("MESURES AVANCÉES")
-        action("◈  Charge moteur", "PID 0104 • réponse brute") { execute("0104", "Charge moteur") }
-        action("◈  Pression admission", "PID 010B • réponse brute") { execute("010B", "Pression admission") }
-        action("◈  Position accélérateur", "PID 0111 • réponse brute") { execute("0111", "Position papillon") }
-        action("◈  Tension module", "PID 0142 • réponse brute") { execute("0142", "Tension module") }
-        section("MAINTENANCE")
-        action("⚠  Effacer les défauts", "Action sensible • confirmation obligatoire") {
-            AlertDialog.Builder(this).setTitle("Confirmer l'effacement")
-                .setMessage("Effacer les codes peut réinitialiser des données de diagnostic. Effectuez cette action uniquement après réparation.")
-                .setNegativeButton("Annuler", null)
-                .setPositiveButton("Effacer") { _, _ -> execute("04", "Effacement") }.show()
-        }
-        section("RAPPORT • JOURNAL DE DIAGNOSTIC")
-        results = TextView(this).apply {
-            text = "Prêt pour le diagnostic. Connectez un boîtier ELM327 Bluetooth Classic déjà associé au téléphone."
-            textSize = 14f
-            setTextColor(Color.rgb(213, 229, 243))
-            setBackgroundColor(panel)
-            setPadding(20, 20, 20, 20)
-        }
-        content.addView(results)
+        root.addView(nav)
         setContentView(root)
+        showTab(0)
     }
     private fun log(message: String) = runOnUiThread { results.text = message + "\n\n" + results.text }
     private fun connect() {
