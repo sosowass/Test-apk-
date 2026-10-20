@@ -332,11 +332,11 @@ class MainActivity : Activity() {
                 if (cmd.startsWith("01") && !reading.startsWith("Donnée indisponible") &&
                     reading != raw.trim()) {
                     runOnUiThread {
-                        latestReadings[label] = reading.substringBefore("\\n")
+                        latestReadings[label] = reading.substringBefore("\n")
                         if (selectedTab == 2) showTab(2)
                     }
                 }
-                log("$label\\n$reading")
+                log("$label\n$reading")
             }
             catch (e: Exception) { log("Erreur : ${e.message}") }
         }
