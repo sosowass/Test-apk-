@@ -28,8 +28,8 @@ class MainActivity : Activity() {
     private val blue = Color.rgb(0, 153, 255)
     private var selectedTab = 0
     @Volatile private var isConnected = false
-    private var liveReading = false
     private val latestReadings = linkedMapOf<String, String>()
+    private val history = StringBuilder()
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var nav: LinearLayout
@@ -157,6 +157,7 @@ class MainActivity : Activity() {
             }
             3 -> {
                 section("RAPPORT DE DIAGNOSTIC")
+                rowAction("Statut", if (isConnected) "Connecté au boîtier ELM327" else "Hors ligne • données indisponibles") {}
                 content.addView(results.apply { (parent as? android.view.ViewGroup)?.removeView(this) },
                     LinearLayout.LayoutParams(-1, -2).apply { setMargins(5, 5, 5, 12) })
                 rowAction("Partager le journal", "Exporter les résultats en texte vers une autre application") {
@@ -178,6 +179,7 @@ class MainActivity : Activity() {
                 section("PARAMÈTRES")
                 rowAction("Adaptateur OBD2", "Bluetooth Classic • ELM327") { connect() }
                 rowAction("Version", "Bilal27000diag • Diagnostic OBD-II générique") {}
+                rowAction("Aide Bluetooth", "Contact mis • boîtier branché • appairage Android • connexion dans l’application") {}
                 rowAction("Sécurité", "Ne pas utiliser l'application pendant la conduite.") {}
             }
         }
@@ -254,7 +256,11 @@ class MainActivity : Activity() {
         setContentView(root)
         showTab(0)
     }
-    private fun log(message: String) = runOnUiThread { results.text = message + "\n\n" + results.text }
+    private fun log(message: String) = runOnUiThread {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE).format(java.util.Date())
+        history.append(timestamp).append("  ").append(message).append("\n\n")
+        results.text = history.toString()
+    }
     private fun connect() {
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1); return
@@ -279,6 +285,7 @@ class MainActivity : Activity() {
                     log("Connexion établie. Protocole automatique activé.")
                 } catch (e: Exception) {
                     isConnected = false
+                    latestReadings.clear()
                     try { socket?.close() } catch (_: Exception) {}
                     input = null; output = null; socket = null
                     runOnUiThread { status.text = "● HORS LIGNE • ELM327" }
@@ -292,12 +299,14 @@ class MainActivity : Activity() {
         val inp = input ?: error("Boîtier non connecté")
         out.write((cmd + "\r").toByteArray()); out.flush()
         val sb = StringBuilder(); val until = System.currentTimeMillis()+6000
+        var completed = false
         while (System.currentTimeMillis() < until) {
-            if (inp.available()>0) { val b = inp.read(); if (b<0 || b==62) break; sb.append(b.toChar()) }
+            if (inp.available()>0) { val b = inp.read(); if (b<0 || b==62) { completed = b==62; break }; sb.append(b.toChar()) }
             else Thread.sleep(25)
         }
         val reply = sb.toString().trim()
-        if (reply.isBlank()) error("Aucune réponse du boîtier : délai dépassé")
+        if (!completed) error("Délai de réponse ELM327 dépassé")
+        if (reply.isBlank()) error("Aucune réponse du boîtier")
         return reply
     }
     private fun decode(cmd: String, raw: String): String {
