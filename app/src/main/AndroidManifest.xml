@@ -2,6 +2,6 @@
 <uses-permission android:name="android.permission.BLUETOOTH"/>
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 <uses-permission android:name="android.permission.INTERNET"/>
-<application android:label="MOSTA DIAG" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
+<application android:label="Bilal27000diag" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
 <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
 </application></manifest>
