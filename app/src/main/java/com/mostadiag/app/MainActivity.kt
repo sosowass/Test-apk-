@@ -27,6 +27,9 @@ class MainActivity : Activity() {
     private lateinit var results: TextView
     private val blue = Color.rgb(0, 153, 255)
     private var selectedTab = 0
+    @Volatile private var isConnected = false
+    private var liveReading = false
+    private val latestReadings = linkedMapOf<String, String>()
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var nav: LinearLayout
@@ -131,7 +134,10 @@ class MainActivity : Activity() {
                 rowAction("Toutes marques OBD-II", "Fonctions génériques uniquement. L'accès ABS, airbag et constructeur nécessite des protocoles spécifiques.") {}
             }
             2 -> {
-                section("MESURES MOTEUR")
+                section("MESURES MOTEUR • DONNÉES DU VÉHICULE")
+                rowAction(if (isConnected) "●  ELM327 CONNECTÉ" else "○  AUCUNE DONNÉE DISPONIBLE",
+                    if (isConnected) "Appuyez sur une mesure pour interroger le calculateur" else "Connectez un boîtier OBD2 pour obtenir des valeurs réelles",
+                    if (isConnected) Color.rgb(30, 218, 145) else Color.rgb(255, 156, 55)) { if (!isConnected) connect() }
                 addGrid(listOf(
                     tile("Régime", "PID 010C", Color.rgb(173, 94, 255), "◉") { execute("010C", "Régime") },
                     tile("Vitesse", "PID 010D", Color.rgb(36, 160, 255), "➤") { execute("010D", "Vitesse") },
@@ -142,8 +148,12 @@ class MainActivity : Activity() {
                     tile("Tension", "PID 0142", Color.rgb(36, 213, 195), "ϟ") { execute("0142", "Tension module") },
                     tile("Défauts", "Mode 03", Color.rgb(255, 95, 70), "⚙") { execute("03", "Codes défauts") }
                 ))
+                if (latestReadings.isNotEmpty()) {
+                    section("DERNIÈRES MESURES REÇUES")
+                    latestReadings.forEach { (key, value) -> rowAction(key, value) {} }
+                }
                 section("INFORMATIONS")
-                rowAction("Valeurs en réponse brute", "Décodage et graphiques temps réel prévus pour une version ultérieure.") {}
+                rowAction("Données réelles uniquement", "Les valeurs sont lues sur le véhicule, sans démonstration fictive.") {}
             }
             3 -> {
                 section("RAPPORT DE DIAGNOSTIC")
@@ -185,7 +195,10 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(text("◈", 40f, cyan, true))
+        header.addView(ImageView(this).apply {
+            setImageResource(com.mostadiag.app.R.drawable.bilal_engine)
+            contentDescription = "Logo Bilal27000diag moteur diagnostic"
+        }, LinearLayout.LayoutParams(76, 76))
         val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 0, 0, 0) }
         brand.addView(text("BILAL27000DIAG", 24f, Color.WHITE, true))
         brand.addView(text("DIAGNOSTIC AUTO • OBD-II", 11f, cyan).apply { letterSpacing = 0.1f })
@@ -199,7 +212,11 @@ class MainActivity : Activity() {
                 intArrayOf(Color.rgb(9, 52, 95), Color.rgb(6, 17, 36), Color.rgb(56, 26, 53))
             ).apply { cornerRadius = 26f; setStroke(2, Color.rgb(37, 120, 172)) }
         }
-        hero.addView(text("◈  BILAL27000DIAG", 23f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
+        hero.addView(ImageView(this).apply {
+            setImageResource(com.mostadiag.app.R.drawable.bilal_engine)
+            contentDescription = "Bilal27000diag"
+        }, LinearLayout.LayoutParams(-1, 110))
+        hero.addView(text("BILAL27000DIAG", 23f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
         hero.addView(text("VOTRE VÉHICULE EN TOUTE CLARTÉ", 11f, cyan, true).apply {
             gravity = Gravity.CENTER
             letterSpacing = 0.1f
@@ -254,10 +271,19 @@ class MainActivity : Activity() {
                     adapter?.cancelDiscovery()
                     s.connect()
                     socket = s; input = s.inputStream; output = s.outputStream
-                    command("ATZ"); command("ATE0"); command("ATL0"); command("ATS0"); command("ATSP0")
+                    val reset = command("ATZ")
+                    if (reset.isBlank() || reset.contains("ERROR", ignoreCase = true)) error("Boîtier sans réponse valide")
+                    command("ATE0"); command("ATL0"); command("ATS0"); command("ATSP0")
+                    isConnected = true
                     runOnUiThread { status.text = "● Connecté : ${device.name}" }
                     log("Connexion établie. Protocole automatique activé.")
-                } catch (e: Exception) { log("Échec de connexion : ${e.message}") }
+                } catch (e: Exception) {
+                    isConnected = false
+                    try { socket?.close() } catch (_: Exception) {}
+                    input = null; output = null; socket = null
+                    runOnUiThread { status.text = "● HORS LIGNE • ELM327" }
+                    log("Échec de connexion : ${e.message}")
+                }
             }
         }.show()
     }
@@ -270,9 +296,14 @@ class MainActivity : Activity() {
             if (inp.available()>0) { val b = inp.read(); if (b<0 || b==62) break; sb.append(b.toChar()) }
             else Thread.sleep(25)
         }
-        return sb.toString().trim()
+        val reply = sb.toString().trim()
+        if (reply.isBlank()) error("Aucune réponse du boîtier : délai dépassé")
+        return reply
     }
     private fun decode(cmd: String, raw: String): String {
+        if (raw.contains("NO DATA", true) || raw.contains("UNABLE TO CONNECT", true) ||
+            raw.contains("ERROR", true) || raw.contains("STOPPED", true) || raw.trim() == "?")
+            return "Donnée indisponible • réponse du véhicule : " + raw.trim()
         val normalized = raw.uppercase().replace(Regex("[^0-9A-F]"), "")
         val key = if (cmd.length == 4 && cmd.startsWith("01")) "41" + cmd.substring(2) else ""
         val idx = if (key.isNotEmpty()) normalized.indexOf(key) else -1
@@ -295,7 +326,18 @@ class MainActivity : Activity() {
     }
     private fun execute(cmd: String, label: String) {
         thread {
-            try { val raw = command(cmd); log("$label\n${decode(cmd, raw)}") }
+            try {
+                val raw = command(cmd)
+                val reading = decode(cmd, raw)
+                if (cmd.startsWith("01") && !reading.startsWith("Donnée indisponible") &&
+                    reading != raw.trim()) {
+                    runOnUiThread {
+                        latestReadings[label] = reading.substringBefore("\\n")
+                        if (selectedTab == 2) showTab(2)
+                    }
+                }
+                log("$label\\n$reading")
+            }
             catch (e: Exception) { log("Erreur : ${e.message}") }
         }
     }
