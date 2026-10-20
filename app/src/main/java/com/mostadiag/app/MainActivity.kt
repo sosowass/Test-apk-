@@ -291,7 +291,7 @@ class MainActivity : Activity() {
             "0142" -> if (b != null) String.format(java.util.Locale.US, "%.2f V", (256 * a + b) / 1000.0) else null
             else -> null
         }
-        return if (value != null) value + "\\nRéponse : " + raw else raw.trim()
+        return if (value != null) value + "\nRéponse : " + raw else raw.trim()
     }
     private fun execute(cmd: String, label: String) {
         thread {
