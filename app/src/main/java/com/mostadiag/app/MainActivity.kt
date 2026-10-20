@@ -191,6 +191,22 @@ class MainActivity : Activity() {
         brand.addView(text("DIAGNOSTIC AUTO • OBD-II", 11f, cyan).apply { letterSpacing = 0.1f })
         header.addView(brand)
         root.addView(header)
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(12, 18, 12, 18)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(9, 52, 95), Color.rgb(6, 17, 36), Color.rgb(56, 26, 53))
+            ).apply { cornerRadius = 26f; setStroke(2, Color.rgb(37, 120, 172)) }
+        }
+        hero.addView(text("◈  BILAL27000DIAG", 23f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
+        hero.addView(text("VOTRE VÉHICULE EN TOUTE CLARTÉ", 11f, cyan, true).apply {
+            gravity = Gravity.CENTER
+            letterSpacing = 0.1f
+            setPadding(0, 10, 0, 8)
+        })
+        hero.addView(text("▰▰   AUTOMOTIVE DIAGNOSTICS   ▰▰", 13f, Color.rgb(152, 205, 246)).apply { gravity = Gravity.CENTER })
+        root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
         status = text("●  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(27, 227, 158), true).apply {
             background = rounded(panel, Color.rgb(27, 227, 158))
             setPadding(19, 21, 19, 21)
@@ -256,9 +272,30 @@ class MainActivity : Activity() {
         }
         return sb.toString().trim()
     }
+    private fun decode(cmd: String, raw: String): String {
+        val normalized = raw.uppercase().replace(Regex("[^0-9A-F]"), "")
+        val key = if (cmd.length == 4 && cmd.startsWith("01")) "41" + cmd.substring(2) else ""
+        val idx = if (key.isNotEmpty()) normalized.indexOf(key) else -1
+        if (idx < 0) return raw.trim()
+        val data = normalized.substring(idx + key.length)
+        if (data.length < 2) return raw.trim()
+        val a = data.substring(0, 2).toIntOrNull(16) ?: return raw.trim()
+        val b = if (data.length >= 4) data.substring(2, 4).toIntOrNull(16) else null
+        val value: String? = when (cmd) {
+            "010C" -> if (b != null) ((256 * a + b) / 4.0).toString() + " tr/min" else null
+            "010D" -> a.toString() + " km/h"
+            "0105" -> (a - 40).toString() + " °C"
+            "0104" -> String.format(java.util.Locale.US, "%.1f %%", a * 100.0 / 255)
+            "010B" -> a.toString() + " kPa"
+            "0111" -> String.format(java.util.Locale.US, "%.1f %%", a * 100.0 / 255)
+            "0142" -> if (b != null) String.format(java.util.Locale.US, "%.2f V", (256 * a + b) / 1000.0) else null
+            else -> null
+        }
+        return if (value != null) value + "\\nRéponse : " + raw else raw.trim()
+    }
     private fun execute(cmd: String, label: String) {
         thread {
-            try { log("$label\n${command(cmd)}") }
+            try { val raw = command(cmd); log("$label\n${decode(cmd, raw)}") }
             catch (e: Exception) { log("Erreur : ${e.message}") }
         }
     }
