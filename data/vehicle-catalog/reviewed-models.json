@@ -1,0 +1,212 @@
+{
+  "reviewed_at": "2026-10-21",
+  "scope": "Factual model names only; no production years inferred.",
+  "entries": [
+    {
+      "make": "Avatr",
+      "models": [
+        "06",
+        "06T",
+        "07",
+        "07L",
+        "11",
+        "12",
+        "011",
+        "012"
+      ],
+      "urls": [
+        "https://www.avatr.com/"
+      ]
+    },
+    {
+      "make": "Bestune",
+      "models": [
+        "B70",
+        "B70S",
+        "NAT E05",
+        "T55",
+        "T77",
+        "T90",
+        "T99",
+        "M9",
+        "JOYEE 07",
+        "JOYEE 08"
+      ],
+      "urls": [
+        "https://bestune.it/modelli-bestune"
+      ]
+    },
+    {
+      "make": "Brilliance",
+      "models": [
+        "BS2",
+        "BS4",
+        "BS6",
+        "BC3",
+        "FRV",
+        "FRV Cross",
+        "FSV",
+        "H220",
+        "H230",
+        "H320",
+        "H330",
+        "H530",
+        "H3",
+        "M1",
+        "M2",
+        "M3",
+        "Tun",
+        "V3",
+        "V5",
+        "V6",
+        "V7",
+        "B8"
+      ],
+      "urls": [
+        "https://en.wikipedia.org/wiki/Brilliance_Auto"
+      ]
+    },
+    {
+      "make": "Exeed",
+      "models": [
+        "LX",
+        "RX",
+        "TXL",
+        "VX",
+        "ES",
+        "ET"
+      ],
+      "urls": [
+        "https://www.exeedinternational.com/global/",
+        "https://www.exeedinternational.com/global/es/",
+        "https://www.exeedinternational.com/global/et/"
+      ]
+    },
+    {
+      "make": "IM Motors",
+      "models": [
+        "IM5",
+        "IM6",
+        "L6",
+        "L7",
+        "LS6",
+        "LS7",
+        "LS9"
+      ],
+      "urls": [
+        "https://www.immotors.com/global/en/landing",
+        "https://www.immotors.com/website/gallery?key=2"
+      ]
+    },
+    {
+      "make": "Roewe",
+      "models": [
+        "RX5 PLUS",
+        "i5",
+        "i6",
+        "i6 MAX EV",
+        "iMAX8",
+        "iMAX8 EV",
+        "iMAX8 DMH",
+        "D5X DMH",
+        "M7 DMH",
+        "D7 DMH",
+        "D7 EV",
+        "D6",
+        "Ei5"
+      ],
+      "urls": [
+        "https://www.roewe.com.cn/vehicles/"
+      ]
+    },
+    {
+      "make": "Xiaomi Auto",
+      "models": [
+        "SU7",
+        "SU7 Ultra",
+        "YU7"
+      ],
+      "urls": [
+        "https://www.xiaomiev.com/",
+        "https://www.mi.com/global/discover/article?id=3768"
+      ]
+    },
+    {
+      "make": "Yangwang",
+      "models": [
+        "U7",
+        "U8",
+        "U8L",
+        "U9",
+        "U9 Xtreme"
+      ],
+      "urls": [
+        "https://www.bydglobal.com/cn/yangwang"
+      ]
+    },
+    {
+      "make": "Zotye",
+      "models": [
+        "2008",
+        "5008",
+        "M300",
+        "T200",
+        "Z100",
+        "Z200",
+        "Z200HB",
+        "Z300",
+        "Z360",
+        "Z500",
+        "Z560",
+        "Z700",
+        "T300",
+        "T500",
+        "T600",
+        "T700",
+        "T800",
+        "SR7",
+        "SR9",
+        "V10",
+        "E20 EV",
+        "E30 EV",
+        "E200 EV",
+        "E300 EV"
+      ],
+      "urls": [
+        "https://en.wikipedia.org/wiki/Zotye_Auto"
+      ]
+    },
+    {
+      "make": "Lifan",
+      "models": [
+        "LF6361",
+        "LF1010",
+        "320",
+        "330",
+        "520",
+        "520i",
+        "530",
+        "620",
+        "630",
+        "650",
+        "720",
+        "820",
+        "Lotto",
+        "Xuanlang",
+        "M7",
+        "X50",
+        "X60",
+        "Maiwei",
+        "X70",
+        "X80",
+        "Foison",
+        "LF1022",
+        "Xingshun",
+        "LF1025"
+      ],
+      "urls": [
+        "https://en.wikipedia.org/wiki/Lifan_Group"
+      ]
+    }
+  ]
+}
