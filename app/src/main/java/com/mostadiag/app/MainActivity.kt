@@ -24,13 +24,19 @@ import java.io.OutputStream
 import java.util.UUID
 import kotlin.concurrent.thread
 
+import android.graphics.Typeface
+import android.graphics.drawable.RippleDrawable
+import android.content.res.ColorStateList
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+
 class MainActivity : Activity() {
     private var socket: BluetoothSocket? = null
     private var input: InputStream? = null
     private var output: OutputStream? = null
     private lateinit var status: TextView
     private lateinit var results: TextView
-    private val blue = Color.rgb(0, 153, 255)
     private var selectedTab = 0
     @Volatile private var isConnected = false
     private val latestReadings = linkedMapOf<String, String>()
@@ -58,10 +64,10 @@ class MainActivity : Activity() {
     private fun chooseVehicle() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 12, 30, 8)
+            setPadding(dp(24), dp(12), dp(24), dp(8))
         }
         val make = AutoCompleteTextView(this).apply {
-            hint = "Rechercher parmi 143 marques"
+            hint = "Rechercher une marque"
             threshold = 1
             setSingleLine(true)
             setText(selectedMake)
@@ -89,11 +95,11 @@ class MainActivity : Activity() {
             value = if (selectedYear in 1950..2027) selectedYear else 2026
             wrapSelectorWheel = false
         }
-        form.addView(text("MARQUE", 13f, cyan, true))
+        form.addView(text("MARQUE", 12f, cyan, true))
         form.addView(make)
-        form.addView(text("MODÈLE", 13f, cyan, true))
+        form.addView(text("MODÈLE", 12f, cyan, true))
         form.addView(model)
-        form.addView(text("ANNÉE", 13f, cyan, true))
+        form.addView(text("ANNÉE", 12f, cyan, true))
         form.addView(year)
         val formScroll = ScrollView(this).apply { addView(form) }
         AlertDialog.Builder(this).setTitle("Sélection du véhicule")
@@ -120,405 +126,390 @@ class MainActivity : Activity() {
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var nav: LinearLayout
-    private val bg = Color.rgb(5, 12, 26)
-    private val panel = Color.rgb(16, 29, 51)
-    private val cyan = Color.rgb(40, 205, 248)
+    private val bg = Color.rgb(4, 10, 19)
+    private val panel = Color.rgb(13, 24, 39)
+    private val cyan = Color.rgb(48, 214, 255)
+    private val muted = Color.rgb(154, 176, 199)
+    private val green = Color.rgb(43, 226, 165)
+    private val amber = Color.rgb(255, 182, 79)
+    private val red = Color.rgb(255, 102, 112)
+    private val purple = Color.rgb(184, 131, 255)
     private val adapter by lazy { (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter }
-    private fun rounded(color: Int, stroke: Int = color, radius: Float = 22f): GradientDrawable =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = radius
-            setStroke(2, stroke)
-        }
-
+    private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
+    private val wide get() = resources.configuration.screenWidthDp >= 600
+    private val largeText get() = resources.configuration.fontScale > 1.25f
+    private fun rounded(color: Int, stroke: Int = Color.rgb(34, 54, 74), radius: Float = 18f): GradientDrawable =
+        GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat(); setStroke(dp(1), stroke) }
+    private fun surface(accent: Int = Color.rgb(34, 54, 74)) = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(17, 32, 51), Color.rgb(8, 17, 29))
+    ).apply { cornerRadius = dp(18).toFloat(); setStroke(dp(1), accent) }
     private fun text(value: String, size: Float, color: Int = Color.WHITE, bold: Boolean = false): TextView =
         TextView(this).apply {
-            this.text = value
-            textSize = size
-            setTextColor(color)
-            if (bold) setTypeface(null, android.graphics.Typeface.BOLD)
+            text = value; textSize = size; setTextColor(color)
+            typeface = Typeface.create(if (bold) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+            includeFontPadding = false
+            setLineSpacing(dp(3).toFloat(), 1f)
         }
-
-    private fun tile(title: String, subtitle: String, color: Int, symbol: String, fn: () -> Unit): LinearLayout =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(panel, Color.rgb(10, 23, 43))).apply { cornerRadius = 28f; setStroke(2, color) }
-            setPadding(12, 25, 12, 25)
-            elevation = 7f
-            animate().alpha(1f).setDuration(350).start()
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { fn() }
-            addView(text(symbol, 31f, color, true).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 0f, color) })
-            addView(text(title, 15f, Color.WHITE, true).apply {
-                gravity = Gravity.CENTER
-                setPadding(0, 12, 0, 5)
-            })
-            addView(text(subtitle, 11f, Color.rgb(166, 192, 213)).apply { gravity = Gravity.CENTER })
-        }
-
-    private fun gauge(title: String, unit: String, accent: Int, value: String): LinearLayout {
-        val frame = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(8, 13, 8, 12)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(17, 42, 76), Color.rgb(5, 14, 32))).apply {
-                cornerRadius = 22f
-                setStroke(2, Color.rgb(29, 88, 143))
-            }
-        }
-        frame.addView(text(title, 12f, Color.rgb(210, 232, 250), true).apply { gravity = Gravity.CENTER })
-        val dial = object : View(this) {
-            private val p = android.graphics.Paint(3)
-            override fun onDraw(c: android.graphics.Canvas) {
-                val cx = width / 2f; val cy = height / 2f
-                val radius = minOf(width, height) * .38f
-                p.style = android.graphics.Paint.Style.STROKE
-                p.strokeWidth = 12f
-                p.strokeCap = android.graphics.Paint.Cap.ROUND
-                p.color = Color.rgb(27, 61, 96)
-                c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 135f, 270f, false, p)
-                p.color = accent
-                p.strokeWidth = 5f
-                c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 135f, 270f, false, p)
-                p.style = android.graphics.Paint.Style.FILL
-                p.textAlign = android.graphics.Paint.Align.CENTER
-                p.color = Color.WHITE
-                p.textSize = 34f
-                p.typeface = android.graphics.Typeface.DEFAULT_BOLD
-                c.drawText(value, cx, cy+9f, p)
-                p.textSize = 13f
-                p.color = Color.rgb(165, 199, 222)
-                c.drawText(unit, cx, cy+29f, p)
-            }
-        }
-        frame.addView(dial, LinearLayout.LayoutParams(-1, 145))
-        return frame
-    }
-    private fun addGrid(items: List<LinearLayout>) {
-        items.chunked(2).forEach { pair ->
-            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            pair.forEach { item ->
-                line.addView(item, LinearLayout.LayoutParams(0, -2, 1f).apply {
-                    setMargins(5, 5, 5, 5)
-                })
-            }
-            if (pair.size == 1) line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-            content.addView(line)
+    private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    private fun icon(kind: String, color: Int = cyan, size: Int = 28, glow: Boolean = false) =
+        NeonIcon(this, kind, color, glow).apply { layoutParams = LinearLayout.LayoutParams(dp(size), dp(size)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+    private fun actionable(view: View, accent: Int = cyan, action: () -> Unit) {
+        view.isClickable = true; view.isFocusable = true
+        view.foreground = RippleDrawable(ColorStateList.valueOf(Color.argb(40, Color.red(accent), Color.green(accent), Color.blue(accent))), null, rounded(Color.WHITE))
+        view.setOnClickListener { action() }
+        view.setOnTouchListener { v, e ->
+            when(e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> v.animate().scaleX(.985f).scaleY(.985f).setDuration(100).start()
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+            }; false
         }
     }
-
-    private fun section(title: String) {
-        content.addView(text(title, 13f, cyan, true).apply {
-            letterSpacing = 0.11f
-            setPadding(10, 25, 10, 12)
+    private fun add(view: View, gap: Int = 10) {
+        content.addView(view, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(gap) })
+    }
+    private fun section(title: String, aside: String = "") {
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(2), dp(14), dp(2), dp(12)) }
+        row.addView(text(title, 11f, cyan, true).apply { letterSpacing = .12f }, LinearLayout.LayoutParams(0, -2, 1f))
+        if (aside.isNotBlank()) row.addView(text(aside, 11f, muted))
+        add(row, 0)
+    }
+    private fun pageTitle(kicker: String, title: String, subtitle: String) {
+        add(column().apply {
+            setPadding(dp(4), dp(18), dp(4), dp(12))
+            addView(text(kicker, 10f, cyan, true).apply { letterSpacing = .2f })
+            addView(text(title, if (wide) 34f else 29f, Color.WHITE, true).apply { setPadding(0, dp(8), 0, dp(8)) })
+            addView(text(subtitle, 13f, muted))
         })
     }
-
-    private fun brandLogo(name: String): TextView {
-        val monogram = when (name) {
-            "Peugeot" -> "♞"
-            "Renault" -> "◇"
-            "Citroën" -> "⌃⌃"
-            "Volkswagen" -> "VW"
-            "BMW" -> "BMW"
-            "Mercedes-Benz" -> "✦"
-            "Audi" -> "◎◎"
-            "Toyota" -> "Ⓣ"
-            "Ford" -> "Ford"
-            "Hyundai" -> "H"
-            "Kia" -> "KIA"
-            "Nissan" -> "N"
-            else -> name.take(2).uppercase()
+    private fun note(title: String, body: String, color: Int = cyan, kind: String = "shield") {
+        add(LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL; background = rounded(panel)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            addView(icon(kind, color, 30))
+            addView(column().apply {
+                setPadding(dp(14), 0, 0, 0)
+                addView(text(title, 14f, Color.WHITE, true))
+                addView(text(body, 12f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        })
+    }
+    private fun connectionCard() {
+        (status.parent as? android.view.ViewGroup)?.removeView(status)
+        val card = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            background = surface(if (isConnected) green else Color.rgb(36, 90, 111))
+            setPadding(dp(14), dp(15), dp(14), dp(15))
+            addView(icon("bluetooth", if (isConnected) green else cyan, 36, true))
+            addView(column().apply {
+                setPadding(dp(12), 0, dp(8), 0)
+                addView(status)
+                addView(text("ELM327 · Bluetooth Classic · OBD-II", 11f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(icon("arrow", muted, 20))
         }
-        return text(monogram, 17f, Color.WHITE, true).apply {
-            gravity = Gravity.CENTER
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(12, 98, 163), Color.rgb(11, 24, 48))).apply {
-                cornerRadius = 18f
-                setStroke(2, cyan)
-            }
+        actionable(card) { connect() }; add(card)
+    }
+    private val brandResources = mapOf(
+        "Peugeot" to R.drawable.brand_peugeot, "Renault" to R.drawable.brand_renault,
+        "Citroën" to R.drawable.brand_citroen, "Volkswagen" to R.drawable.brand_volkswagen,
+        "BMW" to R.drawable.brand_bmw, "Audi" to R.drawable.brand_audi,
+        "Toyota" to R.drawable.brand_toyota, "Ford" to R.drawable.brand_ford,
+        "Hyundai" to R.drawable.brand_hyundai, "Kia" to R.drawable.brand_kia,
+        "Nissan" to R.drawable.brand_nissan, "Honda" to R.drawable.brand_honda,
+        "Mazda" to R.drawable.brand_mazda, "Opel" to R.drawable.brand_opel,
+        "Fiat" to R.drawable.brand_fiat, "Volvo" to R.drawable.brand_volvo,
+        "Porsche" to R.drawable.brand_porsche, "Tesla" to R.drawable.brand_tesla,
+        "Jeep" to R.drawable.brand_jeep, "Suzuki" to R.drawable.brand_suzuki,
+        "Dacia" to R.drawable.brand_dacia, "Seat" to R.drawable.brand_seat, "Skoda" to R.drawable.brand_skoda
+    )
+    private fun brandLogo(name: String, size: Int = 36): View = brandResources[name]?.let { resource ->
+        ImageView(this).apply {
+            setImageResource(resource); scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = name; layoutParams = LinearLayout.LayoutParams(dp(size), dp(size))
         }
+    } ?: icon("car", cyan, size)
+    private fun vehicleCard() {
+        val card = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL; background = surface()
+            setPadding(dp(16), dp(16), dp(14), dp(16))
+            addView(brandLogo(selectedMake, 36))
+            addView(column().apply {
+                setPadding(dp(14), 0, dp(6), 0)
+                addView(text(if (selectedMake.isBlank()) "Votre véhicule" else "$selectedMake $selectedModel", 16f, Color.WHITE, true))
+                addView(text(if (selectedMake.isBlank()) "Choisir la marque, le modèle et l’année" else "$selectedYear · Profil renseigné manuellement", 11f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(icon("arrow", muted, 20))
+        }
+        actionable(card) { chooseVehicle() }; add(card)
     }
     private fun brandGallery() {
-        section("CONSTRUCTEURS • LOGOS")
-        content.addView(text("Choisissez une marque pour explorer ses modèles", 12f, Color.rgb(169, 196, 224)))
-        val brands = listOf(
-            "Peugeot" to "peugeot", "Renault" to "renault", "Citroën" to "citroen",
-            "Volkswagen" to "volkswagen", "BMW" to "bmw", "Mercedes-Benz" to "mercedes",
-            "Audi" to "audi", "Toyota" to "toyota", "Ford" to "ford",
-            "Hyundai" to "hyundai", "Kia" to "kia", "Nissan" to "nissan",
-            "Honda" to "honda", "Mazda" to "mazda", "Opel" to "opel",
-            "Fiat" to "fiat", "Volvo" to "volvo", "Porsche" to "porsche",
-            "Tesla" to "tesla", "Jeep" to "jeep", "Suzuki" to "suzuki",
-            "Dacia" to "dacia", "Seat" to "seat", "Škoda" to "skoda"
-        )
-        brands.chunked(4).forEach { group ->
-            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            group.forEach { (name, slug) ->
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    setPadding(3, 8, 3, 8)
-                    background = rounded(panel, blue, 17f)
-                    setOnClickListener { selectedMake = name; chooseVehicle() }
-                }
-                val logo = android.webkit.WebView(this).apply {
-                    setBackgroundColor(Color.TRANSPARENT)
-                    settings.javaScriptEnabled = false
-                    isFocusable = false
-                    isClickable = false
-                    setOnTouchListener { _, _ -> true }
-                    val html = "<html><body style='margin:0;background:transparent;display:flex;align-items:center;justify-content:center;height:100%'><img style='width:62%;height:75%;object-fit:contain' src='https://cdn.simpleicons.org/" + slug + "/FFFFFF' /></body></html>"
-                    loadDataWithBaseURL("https://cdn.simpleicons.org/", html, "text/html", "UTF-8", null)
-                }
-                card.addView(logo, LinearLayout.LayoutParams(-1, 56))
-                card.elevation = 5f
-                card.addView(text(name, 10f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
-                line.addView(card, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(3, 3, 3, 3) })
+        section("CONSTRUCTEURS", "23 logos hors connexion")
+        val cards = brandResources.keys.map { name ->
+            column().apply {
+                gravity = Gravity.CENTER; background = surface()
+                minimumHeight = dp(92); setPadding(dp(6), dp(14), dp(6), dp(14))
+                addView(brandLogo(name, 30))
+                addView(text(name, 11f, Color.rgb(213, 227, 240), true).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, 0) })
+                actionable(this) { selectedMake = name; chooseVehicle() }
             }
-            content.addView(line)
         }
-        content.addView(text("Logos de marques via Simple Icons : connexion Internet requise pour leur affichage.", 11f, Color.rgb(151, 175, 203)))
+        grid(cards, if (wide) 6 else if (largeText) 2 else 3)
+        rowAction("Une autre marque ?", "Le catalogue complet reste accessible par la recherche.", "car") { chooseVehicle() }
     }
-    private fun rowAction(title: String, detail: String, color: Int = cyan, action: () -> Unit) {
+    private fun grid(items: List<View>, columns: Int = if (wide) 4 else 2) {
+        items.chunked(columns).forEach { group ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; baselineAligned = false }
+            group.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i > 0) marginStart = dp(8) }) }
+            repeat(columns - group.size) { row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(8) }) }
+            add(row, 8)
+        }
+    }
+    private fun tile(title: String, subtitle: String, accent: Int, kind: String, action: () -> Unit): View = column().apply {
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.argb(255, Color.red(accent)/7+8, Color.green(accent)/7+10, Color.blue(accent)/7+17), Color.rgb(8, 17, 29))).apply {
+            cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent)))
+        }
+        setPadding(dp(15), dp(15), dp(14), dp(14)); minimumHeight = dp(126)
+        val top = LinearLayout(this@MainActivity).apply { gravity = Gravity.CENTER_VERTICAL }
+        top.addView(icon(kind, accent, 32, true))
+        top.addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
+        top.addView(icon("arrow", accent, 16)); addView(top)
+        addView(text(title, 14f, Color.WHITE, true).apply { setPadding(0, dp(11), 0, dp(5)) })
+        addView(text(subtitle, 11f, muted))
+        actionable(this, accent, action)
+    }
+    private fun rowAction(title: String, detail: String, kind: String = "pulse", color: Int = cyan, action: (() -> Unit)? = null) {
         val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 19, 20, 19)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(21, 43, 74), Color.rgb(9, 19, 40))).apply { cornerRadius = 24f; setStroke(2, color) }
-            elevation = 5f
-            isClickable = true
-            setOnClickListener { action() }
-            setOnTouchListener { view, event ->
-                when (event.action) {
-                    android.view.MotionEvent.ACTION_DOWN -> view.animate().scaleX(.97f).scaleY(.97f).setDuration(110).start()
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> view.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+            gravity = Gravity.CENTER_VERTICAL; background = surface(); minimumHeight = dp(78)
+            setPadding(dp(16), dp(17), dp(14), dp(17))
+            addView(icon(kind, color, 27))
+            addView(column().apply {
+                setPadding(dp(14), 0, dp(8), 0)
+                addView(text(title, 15f, Color.WHITE, true))
+                addView(text(detail, 12f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (action != null) addView(icon("arrow", muted, 18))
+        }
+        if (action != null) actionable(card, color, action)
+        add(card)
+    }
+    private fun hero() {
+        val frame = FrameLayout(this).apply { background = rounded(panel); clipToOutline = true }
+        frame.addView(ImageView(this).apply {
+            setImageResource(R.drawable.garage_hero); scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "Illustration automobile : berline noire dans un atelier éclairé en cyan"
+        }, FrameLayout.LayoutParams(-1, -1))
+        frame.addView(View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.argb(140, 2, 10, 20), Color.TRANSPARENT, Color.argb(220, 2, 10, 20)))
+        }, FrameLayout.LayoutParams(-1, -1))
+        frame.addView(column().apply {
+            setPadding(dp(18), dp(17), dp(18), 0)
+            addView(text("VOTRE VÉHICULE, EN TOUTE CLARTÉ.", 10f, cyan, true).apply { letterSpacing = .12f })
+            addView(text("L’exigence du diagnostic.", if (wide) 26f else 21f, Color.WHITE, true).apply { setPadding(0, dp(8), 0, 0) })
+        }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        frame.addView(text("MULTIMARQUE   /   OBD-II   /   BLUETOOTH", 9f, Color.rgb(190, 223, 240), true).apply {
+            letterSpacing = .08f; setPadding(dp(18), 0, dp(12), dp(14))
+        }, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        content.addView(frame, LinearLayout.LayoutParams(-1, dp(if (wide) 320 else if (largeText) 270 else 232)).apply { bottomMargin = dp(12) })
+    }
+    private fun reading(vararg labels: String): String? = if (isConnected) labels.firstNotNullOfOrNull { latestReadings[it] } else null
+    private fun gauge(title: String, unit: String, accent: Int, value: String?, max: Float, action: () -> Unit): View = column().apply {
+        gravity = Gravity.CENTER; background = surface(); setPadding(dp(8), dp(15), dp(8), dp(12))
+        addView(text(title, 11f, Color.rgb(208, 225, 241), true).apply { gravity = Gravity.CENTER; letterSpacing = .04f })
+        val dial = object : View(this@MainActivity) {
+            private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            override fun onDraw(c: android.graphics.Canvas) {
+                val density = resources.displayMetrics.density
+                val cx = width / 2f; val cy = height * .50f; val radius = minOf(width * .40f, height * .40f)
+                paint.style = android.graphics.Paint.Style.STROKE; paint.strokeCap = android.graphics.Paint.Cap.ROUND
+                paint.strokeWidth = 5 * density; paint.color = Color.rgb(28, 46, 64)
+                c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 140f, 260f, false, paint)
+                val numeric = value?.substringBefore(" ")?.toFloatOrNull()
+                if (numeric != null) {
+                    paint.color = accent
+                    c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 140f, 260f * (numeric/max).coerceIn(0f, 1f), false, paint)
                 }
-                false
+                paint.strokeWidth = density
+                for (tick in 0..20) {
+                    val angle = Math.toRadians((140 + tick * 13).toDouble())
+                    val r1 = radius - 7*density; val r2 = r1 - (if (tick%5 == 0) 6 else 3)*density
+                    paint.color = if (tick%5 == 0) muted else Color.rgb(41, 60, 78)
+                    c.drawLine(cx + kotlin.math.cos(angle).toFloat()*r1, cy + kotlin.math.sin(angle).toFloat()*r1,
+                        cx + kotlin.math.cos(angle).toFloat()*r2, cy + kotlin.math.sin(angle).toFloat()*r2, paint)
+                }
+                paint.style = android.graphics.Paint.Style.FILL; paint.textAlign = android.graphics.Paint.Align.CENTER
+                paint.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); paint.color = if (value == null) muted else Color.WHITE
+                paint.textSize = minOf(33*density*resources.configuration.fontScale, width*.26f)
+                c.drawText(value?.substringBefore(" ") ?: "—", cx, cy + 8*density, paint)
             }
         }
-        card.addView(text(title + "   ›", 17f, Color.WHITE, true))
-        card.addView(text(detail, 12f, Color.rgb(165, 189, 210)).apply { setPadding(0, 6, 0, 0) })
-        content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { setMargins(5, 5, 5, 7) })
+        dial.contentDescription = "$title : ${value ?: "indisponible"} $unit"
+        addView(dial, LinearLayout.LayoutParams(-1, dp(135)))
+        addView(text(unit, 11f, accent).apply { gravity = Gravity.CENTER })
+        addView(text(if (value == null) "EN ATTENTE" else "DERNIÈRE LECTURE", 9f, muted).apply { gravity = Gravity.CENTER; letterSpacing = .08f; setPadding(0, dp(7), 0, 0) })
+        actionable(this, accent, action)
     }
-
+    private fun shareReport() {
+        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, results.text.toString()) }
+        startActivity(Intent.createChooser(send, "Partager le diagnostic"))
+    }
+    private fun confirmClear() {
+        AlertDialog.Builder(this).setTitle("Effacer les codes défauts ?")
+            .setMessage("Cette opération peut supprimer des données de diagnostic. À effectuer après réparation uniquement.")
+            .setNegativeButton("Annuler", null).setPositiveButton("Effacer") { _, _ -> execute("04", "Effacement") }.show()
+    }
     private fun showTab(tab: Int) {
+        val changed = selectedTab != tab
+        val previousY = if (!changed) scroll.scrollY else 0
         selectedTab = tab
         content.removeAllViews()
         for (i in 0 until nav.childCount) {
-            val button = nav.getChildAt(i) as TextView
-            button.setTextColor(if (i == tab) cyan else Color.rgb(155, 171, 194))
+            val button = nav.getChildAt(i) as LinearLayout
+            (button.getChildAt(0) as NeonIcon).apply { tint = if (i == tab) cyan else muted; invalidate() }
+            (button.getChildAt(1) as TextView).setTextColor(if (i == tab) cyan else muted)
+            button.background = if (i == tab) rounded(Color.rgb(9, 39, 56), Color.rgb(21, 76, 97), 14f) else null
+            button.isSelected = i == tab
         }
-        when (tab) {
+        when(tab) {
             0 -> {
-                section("MON GARAGE")
-                rowAction(if (selectedMake.isBlank()) "▣  Choisir mon véhicule" else "▣  $selectedMake $selectedModel",
-                    if (selectedMake.isBlank()) "143 marques • modèle et année" else "Année $selectedYear • Modifier",
-                    Color.rgb(42, 192, 255)) { chooseVehicle() }
-                brandGallery()
-                section("TABLEAU DE BORD")
-                rowAction("◉  Connexion ELM327", "Bluetooth Classic • appuyer pour choisir le boîtier", Color.rgb(18, 220, 156)) { connect() }
-                section("DIAGNOSTIC RAPIDE")
-                addGrid(listOf(
-                    tile("Codes défauts", "Lecture DTC", Color.rgb(38, 144, 255), "⚙") { execute("03", "Codes défauts") },
-                    tile("Mesures directes", "Capteurs moteur", Color.rgb(255, 85, 76), "▥") { showTab(2) },
-                    tile("Identification", "VIN et protocole", Color.rgb(40, 221, 129), "▣") { showTab(1) },
-                    tile("Rapport", "Historique session", Color.rgb(255, 166, 45), "▤") { showTab(3) },
-                    tile("Régime moteur", "tr/min", Color.rgb(181, 89, 250), "◉") { execute("010C", "Régime moteur") },
-                    tile("Température", "°C", Color.rgb(255, 78, 82), "♨") { execute("0105", "Température moteur") }
+                hero(); connectionCard(); vehicleCard()
+                section("DIAGNOSTIC RAPIDE", "À portée de main")
+                grid(listOf(
+                    tile("Codes défauts", "Lire les DTC du moteur", cyan, "engine") { execute("03", "Codes défauts"); showTab(3) },
+                    tile("Mesures moteur", "Capteurs et instrumentation", red, "bars") { showTab(2) },
+                    tile("Identification", "Véhicule, VIN et protocole", green, "car") { showTab(1) },
+                    tile("Rapport de session", "Consulter et partager", amber, "report") { showTab(3) }
                 ))
-                section("ÉTAT DE LA SESSION")
-                rowAction("Voir le journal", "Résultats et réponses du véhicule") { showTab(3) }
+                section("INSTRUMENTATION", "Données du véhicule")
+                grid(listOf(
+                    gauge("RÉGIME MOTEUR", "tr/min", purple, reading("Régime", "Régime moteur"), 8000f) { execute("010C", "Régime") },
+                    gauge("VITESSE", "km/h", cyan, reading("Vitesse"), 240f) { execute("010D", "Vitesse") }
+                ), 2)
+                note("Un diagnostic connecté", "Les mesures apparaissent après une lecture OBD-II. Aucun signal n’est simulé.")
             }
             1 -> {
-                section("MON VÉHICULE")
-                rowAction("Marque • modèle • année",
-                    if (selectedMake.isBlank()) "Sélectionner mon véhicule" else "$selectedMake $selectedModel • $selectedYear",
-                    Color.rgb(29, 218, 147)) { chooseVehicle() }
-                section("IDENTIFICATION MULTIMARQUE")
-                rowAction("Lire le VIN", "Mode OBD 09 PID 02 • selon compatibilité") { execute("0902", "VIN (réponse brute)") }
-                rowAction("Protocole du véhicule", "Interroger l'interface ELM327") { execute("ATDP", "Protocole actif") }
-                rowAction("Connexion Bluetooth", "Sélectionner un adaptateur déjà associé") { connect() }
-                section("COMPATIBILITÉ")
-                rowAction("Toutes marques OBD-II", "Fonctions génériques uniquement. L'accès ABS, airbag et constructeur nécessite des protocoles spécifiques.") {}
+                pageTitle("01  /  LE GARAGE", "Mon véhicule", "Votre profil automobile et son identification.")
+                vehicleCard()
+                note("Profil du garage", "La sélection manuelle décrit votre véhicule. L’identification du calculateur se lit séparément.", green, "car")
+                section("IDENTIFICATION OBD-II")
+                rowAction("Lire le numéro VIN", "Identification du véhicule · selon compatibilité", "car", green) { execute("0902", "VIN (réponse brute)"); showTab(3) }
+                rowAction("Protocole actif", "Consulter le protocole détecté par l’ELM327", "pulse") { execute("ATDP", "Protocole actif"); showTab(3) }
+                brandGallery()
+                note("Compatibilité multimarque", "Diagnostic OBD-II générique. Les fonctions ABS, airbag et constructeur nécessitent des protocoles spécifiques.", amber)
             }
             2 -> {
-                section("MESURES MOTEUR • DONNÉES DU VÉHICULE")
-                rowAction(if (isConnected) "●  ELM327 CONNECTÉ" else "○  AUCUNE DONNÉE DISPONIBLE",
-                    if (isConnected) "Appuyez sur une mesure pour interroger le calculateur" else "Connectez un boîtier OBD2 pour obtenir des valeurs réelles",
-                    if (isConnected) Color.rgb(30, 218, 145) else Color.rgb(255, 156, 55)) { if (!isConnected) connect() }
-                section("INSTRUMENTATION NUMÉRIQUE")
-                val dials = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                dials.addView(gauge("RÉGIME MOTEUR", "tr/min", cyan, "—"), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(4, 4, 4, 4) })
-                dials.addView(gauge("VITESSE", "km/h", Color.rgb(52, 230, 172), "—"), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(4, 4, 4, 4) })
-                content.addView(dials)
-                section("CAPTEURS ET COMMANDES")
-                addGrid(listOf(
-                    tile("Régime", "PID 010C", Color.rgb(173, 94, 255), "◉") { execute("010C", "Régime") },
-                    tile("Vitesse", "PID 010D", Color.rgb(36, 160, 255), "➤") { execute("010D", "Vitesse") },
-                    tile("Température", "PID 0105", Color.rgb(255, 85, 85), "♨") { execute("0105", "Température") },
-                    tile("Charge", "PID 0104", Color.rgb(30, 218, 145), "▥") { execute("0104", "Charge moteur") },
-                    tile("Admission", "PID 010B", Color.rgb(255, 156, 55), "◎") { execute("010B", "Pression admission") },
-                    tile("Papillon", "PID 0111", Color.rgb(40, 212, 229), "◈") { execute("0111", "Papillon") },
-                    tile("Tension", "PID 0142", Color.rgb(36, 213, 195), "ϟ") { execute("0142", "Tension module") },
-                    tile("Défauts", "Mode 03", Color.rgb(255, 95, 70), "⚙") { execute("03", "Codes défauts") }
+                pageTitle("02  /  INSTRUMENTATION", "Mesures moteur", "Une lecture précise. Une information essentielle.")
+                connectionCard()
+                grid(listOf(
+                    gauge("RÉGIME MOTEUR", "tr/min", purple, reading("Régime", "Régime moteur"), 8000f) { execute("010C", "Régime") },
+                    gauge("VITESSE", "km/h", cyan, reading("Vitesse"), 240f) { execute("010D", "Vitesse") }
+                ), 2)
+                section("CAPTEURS", "Toucher pour lire")
+                grid(listOf(
+                    tile("Température moteur", reading("Température", "Température moteur") ?: "— °C · En attente", red, "temperature") { execute("0105", "Température") },
+                    tile("Tension du module", reading("Tension module") ?: "— V · En attente", green, "battery") { execute("0142", "Tension module") },
+                    tile("Charge moteur", reading("Charge moteur") ?: "— % · En attente", purple, "bars") { execute("0104", "Charge moteur") },
+                    tile("Pression admission", reading("Pression admission") ?: "— kPa · En attente", amber, "gauge") { execute("010B", "Pression admission") },
+                    tile("Papillon", reading("Papillon") ?: "— % · En attente", cyan, "pulse") { execute("0111", "Papillon") },
+                    tile("Codes défauts", "Interroger le calculateur", muted, "engine") { execute("03", "Codes défauts"); showTab(3) }
                 ))
-                if (latestReadings.isNotEmpty()) {
-                    section("DERNIÈRES MESURES REÇUES")
-                    latestReadings.forEach { (key, value) -> rowAction(key, value) {} }
-                }
-                section("INFORMATIONS")
-                rowAction("Données réelles uniquement", "Les valeurs sont lues sur le véhicule, sans démonstration fictive.") {}
+                note("Lectures à la demande", "Chaque carte interroge le véhicule. La valeur affichée est la dernière réponse reçue, sans acquisition continue.")
             }
             3 -> {
-                section("RAPPORT DE DIAGNOSTIC")
-                rowAction("Statut", if (isConnected) "Connecté au boîtier ELM327" else "Hors ligne • données indisponibles") {}
-                content.addView(results.apply { (parent as? android.view.ViewGroup)?.removeView(this) },
-                    LinearLayout.LayoutParams(-1, -2).apply { setMargins(5, 5, 5, 12) })
-                rowAction("Partager le journal", "Exporter les résultats en texte vers une autre application") {
-                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, results.text.toString())
-                    }
-                    startActivity(android.content.Intent.createChooser(send, "Partager le diagnostic"))
-                }
+                pageTitle("03  /  DIAGNOSTIC", "Rapport de session", "Toutes les réponses, réunies dans un journal.")
+                note(if (isConnected) "Session connectée" else "En attente de connexion", if (history.isEmpty()) "Aucune lecture effectuée dans cette session." else "Le journal conserve les réponses et erreurs de cette session.", if (isConnected) green else cyan, "report")
+                section("JOURNAL OBD-II", "Session actuelle")
+                (results.parent as? android.view.ViewGroup)?.removeView(results); add(results, 12)
+                rowAction("Partager le rapport", "Exporter le journal au format texte", "share") { shareReport() }
                 section("MAINTENANCE")
-                rowAction("Effacer les défauts", "Action sensible • confirmation obligatoire", Color.rgb(255, 98, 75)) {
-                    AlertDialog.Builder(this).setTitle("Confirmer l'effacement")
-                        .setMessage("Cette opération peut supprimer des données de diagnostic. À effectuer après réparation uniquement.")
-                        .setNegativeButton("Annuler", null)
-                        .setPositiveButton("Effacer") { _, _ -> execute("04", "Effacement") }.show()
-                }
+                rowAction("Effacer les codes défauts", "Après réparation · une confirmation sera demandée", "engine", red) { confirmClear() }
+                note("Conserver une trace", "Partagez le journal avant toute intervention pour garder les réponses du véhicule.", amber)
             }
-            else -> {
-                section("PARAMÈTRES")
-                rowAction("Adaptateur OBD2", "Bluetooth Classic • ELM327") { connect() }
-                rowAction("Version", "Bilal27000diag • Diagnostic OBD-II générique") {}
-                rowAction("Aide Bluetooth", "Contact mis • boîtier branché • appairage Android • connexion dans l’application") {}
-                rowAction("Sécurité", "Ne pas utiliser l'application pendant la conduite.") {}
+            4 -> {
+                pageTitle("04  /  PRÉFÉRENCES", "Paramètres", "Votre atelier, vos repères.")
+                connectionCard()
+                section("CONNEXION")
+                rowAction("Choisir un adaptateur", "Bluetooth Classic · ELM327", "bluetooth") { connect() }
+                note("Prêt à diagnostiquer", "1. Branchez l’ELM327 et mettez le contact.\n2. Activez le Bluetooth du téléphone.\n3. Choisissez votre adaptateur dans l’application.", cyan, "bluetooth")
+                section("L’APPLICATION")
+                rowAction("Bilal27000diag", "Version ${BuildConfig.VERSION_NAME} · Édition automobile", "engine")
+                rowAction("Identité visuelle", "Bleu nuit · cyan néon · noir", "settings")
+                rowAction("Crédits des illustrations", "Photographie générée et 23 logos Simple Icons intégrés", "car") {
+                    AlertDialog.Builder(this).setTitle("Illustrations et marques")
+                        .setMessage("Illustration automobile générée pour Bilal27000diag. Logos vectoriels issus de Simple Icons (CC0), intégrés à l’APK. Les marques appartiennent à leurs propriétaires ; aucune affiliation n’est revendiquée. Pour les autres marques, un pictogramme automobile est utilisé.")
+                        .setPositiveButton("Fermer", null).show()
+                }
+                section("BONNES PRATIQUES")
+                note("À utiliser à l’arrêt", "Préparez et consultez votre diagnostic véhicule stationné. N’utilisez pas l’application pendant la conduite.", amber)
             }
         }
-        scroll.post { scroll.scrollTo(0, 0) }
+        if (changed && android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f) {
+            content.alpha = .55f; content.translationY = dp(6).toFloat()
+            content.animate().alpha(1f).translationY(0f).setDuration(200).start()
+        }
+        scroll.post { scroll.scrollTo(0, previousY) }
     }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val vehiclePrefs = getSharedPreferences("vehicle", MODE_PRIVATE)
-        selectedMake = vehiclePrefs.getString("make", "") ?: ""
-        selectedModel = vehiclePrefs.getString("model", "") ?: ""
-        selectedYear = vehiclePrefs.getInt("year", 0)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(bg)
-            setPadding(12, 20, 12, 12)
-        }
+        val prefs = getSharedPreferences("vehicle", MODE_PRIVATE)
+        selectedMake = prefs.getString("make", "") ?: ""; selectedModel = prefs.getString("model", "") ?: ""; selectedYear = prefs.getInt("year", 0)
+        val root = column().apply { setBackgroundColor(bg) }
         val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(14), dp(12), dp(12)); minimumHeight = dp(64)
         }
-        header.addView(ImageView(this).apply {
-            setImageResource(com.mostadiag.app.R.drawable.bilal_engine)
-            contentDescription = "Logo Bilal27000diag moteur diagnostic"
-        }, LinearLayout.LayoutParams(76, 76))
-        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 0, 0, 0) }
-        brand.addView(text("BILAL27000DIAG", 24f, Color.WHITE, true))
-        brand.addView(text("DIAGNOSTIC AUTO • OBD-II", 11f, cyan).apply { letterSpacing = 0.1f })
-        header.addView(brand)
+        header.addView(ImageView(this).apply { setImageResource(R.drawable.bilal_engine); contentDescription = "Bilal27000diag" }, LinearLayout.LayoutParams(dp(34), dp(34)))
+        header.addView(column().apply {
+            setPadding(dp(10), 0, dp(4), 0)
+            val name = SpannableString("BILAL27000DIAG").apply { setSpan(ForegroundColorSpan(cyan), 5, 10, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+            addView(text("", if (wide) 23f else 19f, Color.WHITE, true).apply {
+                text = name; letterSpacing = -.02f; setSingleLine(true)
+                setAutoSizeTextTypeUniformWithConfiguration(10, if (wide) 23 else 19, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+            })
+            addView(text("DIAGNOSTIC AUTOMOBILE", 8f, muted, true).apply { letterSpacing = .17f; setPadding(0, dp(4), 0, 0) })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(FrameLayout(this).apply {
+            addView(NeonIcon(this@MainActivity, "settings", muted), FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            contentDescription = "Ouvrir les paramètres"; actionable(this) { showTab(4) }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
         root.addView(header)
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            elevation = 10f
-            setPadding(18, 20, 18, 20)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(6, 55, 103), Color.rgb(8, 20, 41), Color.rgb(40, 18, 52))
-            ).apply { cornerRadius = 30f; setStroke(2, Color.rgb(29, 128, 190)) }
-        }
-        val heroRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        heroRow.addView(ImageView(this).apply {
-            setImageResource(R.drawable.bilal_engine)
-            contentDescription = "Logo diagnostic moteur"
-        }, LinearLayout.LayoutParams(120, 120))
-        val heroText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        heroText.addView(text("DIAGNOSTIC AUTOMOBILE", 17f, Color.WHITE, true))
-        heroText.addView(text("MULTIMARQUE • OBD-II", 12f, cyan, true).apply {
-            setPadding(0, 8, 0, 0)
-        })
-        heroRow.addView(heroText, LinearLayout.LayoutParams(0, -2, 1f))
-        hero.addView(text("GARAGE DIGITAL  /  ÉDITION PREMIUM", 11f, cyan, true).apply { letterSpacing = .13f })
-        hero.addView(heroRow)
-        hero.addView(text("Votre diagnostic, une longueur d’avance.", 14f, Color.rgb(173, 204, 228), true).apply {
-            setPadding(8, 12, 0, 0)
-        })
-        val car = object : View(this) {
-            private val brush = android.graphics.Paint(3)
-            override fun onDraw(c: android.graphics.Canvas) {
-                val w = width.toFloat(); val h = height.toFloat()
-                val outline = android.graphics.Path().apply {
-                    moveTo(w * .07f, h * .70f)
-                    lineTo(w * .13f, h * .48f)
-                    lineTo(w * .31f, h * .42f)
-                    lineTo(w * .43f, h * .20f)
-                    lineTo(w * .68f, h * .20f)
-                    lineTo(w * .81f, h * .43f)
-                    lineTo(w * .92f, h * .50f)
-                    lineTo(w * .95f, h * .70f)
-                    close()
-                }
-                brush.style = android.graphics.Paint.Style.FILL
-                brush.shader = android.graphics.LinearGradient(0f, 0f, w, h,
-                    Color.rgb(34, 110, 178), Color.rgb(4, 12, 30), android.graphics.Shader.TileMode.CLAMP)
-                c.drawPath(outline, brush)
-                brush.shader = null
-                brush.style = android.graphics.Paint.Style.STROKE
-                brush.strokeWidth = 3f
-                brush.color = Color.rgb(76, 204, 255)
-                brush.setShadowLayer(10f, 0f, 0f, Color.CYAN)
-                c.drawPath(outline, brush)
-                brush.strokeWidth = 7f
-                c.drawLine(w * .12f, h * .58f, w * .29f, h * .58f, brush)
-                c.drawLine(w * .73f, h * .58f, w * .90f, h * .58f, brush)
-                brush.clearShadowLayer()
+        status = text("Non connecté · Connecter ELM327", 13f, cyan, true)
+        status.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                status.setTextColor(if (isConnected) green else cyan)
             }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        results = text("Aucune lecture effectuée.\n\nConnectez un adaptateur ELM327 pour commencer votre diagnostic.", 13f, Color.rgb(196, 215, 233)).apply {
+            typeface = Typeface.create("monospace", Typeface.NORMAL); background = rounded(Color.rgb(6, 16, 27))
+            setPadding(dp(18), dp(20), dp(18), dp(20)); minHeight = dp(170); setTextIsSelectable(true)
         }
-        hero.addView(car, LinearLayout.LayoutParams(-1, 180))
-        hero.addView(text("◆  MULTIMARQUE     ◆  OBD-II     ◆  BLUETOOTH", 11f, Color.rgb(139, 210, 245), true).apply { gravity = Gravity.CENTER })
-        root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
-        status = text("○  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(255, 178, 91), true).apply {
-            background = rounded(panel, Color.rgb(255, 178, 91))
-            setPadding(19, 21, 19, 21)
-            setOnClickListener { connect() }
-        }
-        root.addView(status, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 20, 3, 10) })
-        results = text("Journal prêt. Connectez un adaptateur ELM327 Bluetooth Classic déjà associé au téléphone.", 14f, Color.WHITE).apply {
-            background = rounded(panel)
-            setPadding(18, 18, 18, 18)
-        }
-        scroll = ScrollView(this).apply { isFillViewport = false }
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(content)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        scroll = ScrollView(this).apply { isFillViewport = true; clipToPadding = false; isVerticalScrollBarEnabled = false }
+        val holder = FrameLayout(this)
+        content = column().apply { setPadding(dp(16), dp(4), dp(16), dp(14)) }
+        holder.addView(content, FrameLayout.LayoutParams(if (wide) dp(minOf(resources.configuration.screenWidthDp, 900)) else -1, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        scroll.addView(holder); root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         nav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = rounded(panel, Color.rgb(37, 74, 109))
-            setPadding(2, 12, 2, 12)
-            elevation = 12f
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), dp(8), dp(6), dp(8))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.rgb(18, 33, 49), Color.rgb(7, 17, 29)))
+            elevation = dp(12).toFloat()
         }
-        listOf("⌂\nAccueil", "▣\nVéhicule", "▥\nMesures", "▤\nRapport", "⚙\nRéglages").forEachIndexed { i, label ->
-            nav.addView(text(label, 11f).apply {
-                gravity = Gravity.CENTER
-                setPadding(2, 11, 2, 11)
-                setOnClickListener { showTab(i) }
-            }, LinearLayout.LayoutParams(0, -2, 1f))
+        val icons = listOf("home", "car", "bars", "report", "settings")
+        listOf("Accueil", "Véhicule", "Mesures", "Rapport", "Réglages").forEachIndexed { i, label ->
+            nav.addView(column().apply {
+                gravity = Gravity.CENTER; setPadding(dp(2), dp(8), dp(2), dp(8)); minimumHeight = dp(56)
+                addView(icon(icons[i], muted, 23))
+                addView(text(label, 10f, muted, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(5), 0, 0) })
+                tag = "tab_$i"; contentDescription = label
+                actionable(this) { showTab(i) }
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(2); marginEnd = dp(2) })
         }
         root.addView(nav)
+        window.statusBarColor = bg; window.navigationBarColor = Color.rgb(7, 17, 29)
         setContentView(root)
-        android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS.let { window.addFlags(it) }
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-        showTab(0)
+        showTab(savedInstanceState?.getInt("tab", 0) ?: 0)
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("tab", selectedTab); super.onSaveInstanceState(outState)
     }
     private fun log(message: String) = runOnUiThread {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE).format(java.util.Date())
