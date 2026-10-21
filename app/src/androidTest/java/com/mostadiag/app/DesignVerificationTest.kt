@@ -82,7 +82,41 @@ class DesignVerificationTest {
         context.getSharedPreferences("vehicle", 0).edit().putString("make", "Peugeot").putString("model", "308").putInt("year", 2020).commit()
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
             scenario.onActivity { activity ->
-                assertNotNull(activity.getDrawable(R.drawable.brand_peugeot))
+                val logos = listOf(
+                    R.drawable.brand_audi,
+                    R.drawable.brand_bmw,
+                    R.drawable.brand_citroen,
+                    R.drawable.brand_dacia,
+                    R.drawable.brand_fiat,
+                    R.drawable.brand_ford,
+                    R.drawable.brand_honda,
+                    R.drawable.brand_hyundai,
+                    R.drawable.brand_jeep,
+                    R.drawable.brand_kia,
+                    R.drawable.brand_mazda,
+                    R.drawable.brand_nissan,
+                    R.drawable.brand_opel,
+                    R.drawable.brand_peugeot,
+                    R.drawable.brand_porsche,
+                    R.drawable.brand_renault,
+                    R.drawable.brand_seat,
+                    R.drawable.brand_skoda,
+                    R.drawable.brand_suzuki,
+                    R.drawable.brand_tesla,
+                    R.drawable.brand_toyota,
+                    R.drawable.brand_volkswagen,
+                    R.drawable.brand_volvo
+                )
+                logos.forEach { id ->
+                    val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+                    val drawable = requireNotNull(activity.getDrawable(id))
+                    drawable.setBounds(0, 0, 96, 96)
+                    drawable.draw(android.graphics.Canvas(bitmap))
+                    val pixels = IntArray(96 * 96)
+                    bitmap.getPixels(pixels, 0, 96, 0, 0, 96, 96)
+                    assertTrue("Offline logo must render: ${activity.resources.getResourceEntryName(id)}", pixels.count { android.graphics.Color.alpha(it) > 0 } > 30)
+                    bitmap.recycle()
+                }
                 val texts = descendants(activity.window.decorView).filterIsInstance<TextView>().joinToString(" ") { it.text.toString() }
                 assertTrue(texts.contains("Peugeot 308"))
                 assertTrue(texts.contains("Profil renseigné manuellement"))
