@@ -11,6 +11,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { buildConfig = true }
+    // Sideloaded APK: retain the existing OBD permission behavior; Play target migration is separate.
+    lint { disable += "ExpiredTargetSdkVersion" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
