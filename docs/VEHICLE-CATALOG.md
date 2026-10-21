@@ -1,6 +1,6 @@
 # Catalogue de suggestions hors connexion — 0.6.2
 
-La version 0.6.1 proposait 139 marques environ mais des modèles pour seulement 14 marques. La version 0.6.2 embarque 1 969 marques, 48 614 modèles et 193 662 couples modèle/année référencés. Voitures, utilitaires, camions, bus et deux-roues sont recherchables. Les suggestions fonctionnent sans réseau, ignorent accents, casse, espaces et ponctuation et comprennent quelques alias usuels, dont VW.
+La version 0.6.1 proposait 143 marques mais des modèles pour seulement 14 marques. La version 0.6.2 embarque 1 968 marques, 48 610 modèles et 193 658 couples modèle/année référencés. Voitures, utilitaires, camions, bus et deux-roues sont recherchables. Les suggestions fonctionnent sans réseau, ignorent accents, casse, espaces et ponctuation et comprennent quelques alias usuels, dont VW.
 
 Les noms viennent de trois instantanés publics épinglés par commit :
 

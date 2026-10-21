@@ -21,6 +21,12 @@ def key(value):
     return ''.join(c for c in unicodedata.normalize('NFD', value).lower()
                    if unicodedata.category(c)[0] in ('L', 'N'))
 
+MAKE_ALIASES = {'vw': 'Volkswagen', 'mercedes': 'Mercedes-Benz', 'benz': 'Mercedes-Benz',
+                'chevy': 'Chevrolet', 'ds': 'DS Automobiles'}
+
+def make_key(value):
+    return key(MAKE_ALIASES.get(key(value), value))
+
 def build(source_dir, output):
     raw = {}
     for filename, (repo, revision, path) in SOURCES.items():
@@ -35,13 +41,13 @@ def build(source_dir, output):
     global_models = json.loads(raw['global-models.json'])
     additions = json.loads((ROOT / 'data/vehicle-catalog/additions.json').read_text())
     brands = {}
-    preferred = {key(name): name for name in additions['makes'] if name != 'Autre marque'}
-    preferred.update({key(name): preferred.get(key(name), name) for name in global_models})
+    preferred = {make_key(name): name for name in additions['makes'] if name != 'Autre marque'}
+    preferred.update({make_key(name): preferred.get(make_key(name), name) for name in global_models})
     for _, name, _ in vdb['makes']:
-        preferred.setdefault(key(name), name)
+        preferred.setdefault(make_key(name), name)
 
     def brand(name):
-        k = key(name)
+        k = make_key(name)
         if not k:
             raise ValueError('Empty make name')
         return brands.setdefault(k, {'name': preferred.get(k, name), 'models': {}})
@@ -61,11 +67,11 @@ def build(source_dir, output):
     vdb_makes = {slug: name for slug, name, _ in vdb['makes']}
     for make_slug, _, name, *_ in vdb['models']:
         add(vdb_makes[make_slug], name, source=1 << 23)
-        brands[key(vdb_makes[make_slug])]['models'][key(name)]['name'] = name
+        brands[make_key(vdb_makes[make_slug])]['models'][key(name)]['name'] = name
     for name, models in global_models.items():
         for model in models:
             add(name, model, source=1 << 24)
-            brands[key(name)]['models'][key(model)]['name'] = model
+            brands[make_key(name)]['models'][key(model)]['name'] = model
     for name in additions['makes']:
         if name != 'Autre marque':
             brand(name)

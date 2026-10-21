@@ -143,6 +143,7 @@ class DesignVerificationTest {
         assertTrue("International model coverage", catalog.modelCount >= 48000)
         assertEquals("Citroën", catalog.canonicalMake("  CITROEN  "))
         assertEquals("Volkswagen", catalog.canonicalMake("VW"))
+        assertEquals("DS source spellings are merged", catalog.models("DS Automobiles"), catalog.models("DS"))
         assertTrue(catalog.models("Renault").size > 100)
         assertTrue(catalog.models("lifan").map { it.name }.containsAll(listOf("520", "520i", "620", "X50", "X60")))
         assertTrue("No invented production years for reviewed names", catalog.referencedYears("Avatr", "06").isEmpty())
@@ -152,7 +153,8 @@ class DesignVerificationTest {
         assertTrue(catalog.models("Marque personnalisée absente").isEmpty())
         assertEquals(years.toSet(), catalog.yearSuggestions("Marque personnalisée absente", "Modèle libre", 2026).toSet())
 
-        val filtered = VehicleSuggestionsAdapter(context, catalog.makes, VehicleCatalog.aliases)
+        lateinit var filtered: VehicleSuggestionsAdapter
+        instrumentation.runOnMainSync { filtered = VehicleSuggestionsAdapter(context, catalog.makes, VehicleCatalog.aliases) }
         for ((query, expected) in listOf("citroen" to "Citroën", "VW" to "Volkswagen", "MERCEDES" to "Mercedes-Benz")) {
             val ready = CountDownLatch(1)
             instrumentation.runOnMainSync { filtered.filter.filter(query) { ready.countDown() } }
