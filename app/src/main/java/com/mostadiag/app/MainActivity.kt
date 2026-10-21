@@ -56,12 +56,12 @@ class MainActivity : Activity() {
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = rounded(panel, color, 25f)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(panel, Color.rgb(10, 23, 43))).apply { cornerRadius = 28f; setStroke(2, color) }
             setPadding(12, 20, 12, 20)
             isClickable = true
             isFocusable = true
             setOnClickListener { fn() }
-            addView(text(symbol, 31f, color, true).apply { gravity = Gravity.CENTER })
+            addView(text(symbol, 31f, color, true).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 0f, color) })
             addView(text(title, 15f, Color.WHITE, true).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, 12, 0, 5)
@@ -209,22 +209,26 @@ class MainActivity : Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(12, 18, 12, 18)
+            setPadding(18, 20, 18, 20)
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(9, 52, 95), Color.rgb(6, 17, 36), Color.rgb(56, 26, 53))
-            ).apply { cornerRadius = 26f; setStroke(2, Color.rgb(37, 120, 172)) }
+                intArrayOf(Color.rgb(6, 55, 103), Color.rgb(8, 20, 41), Color.rgb(40, 18, 52))
+            ).apply { cornerRadius = 30f; setStroke(2, Color.rgb(29, 128, 190)) }
         }
-        hero.addView(ImageView(this).apply {
-            setImageResource(com.mostadiag.app.R.drawable.bilal_engine)
-            contentDescription = "Bilal27000diag"
-        }, LinearLayout.LayoutParams(-1, 110))
-        hero.addView(text("BILAL27000DIAG", 23f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
-        hero.addView(text("VOTRE VÉHICULE EN TOUTE CLARTÉ", 11f, cyan, true).apply {
-            gravity = Gravity.CENTER
-            letterSpacing = 0.1f
-            setPadding(0, 10, 0, 8)
+        val heroRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        heroRow.addView(ImageView(this).apply {
+            setImageResource(R.drawable.bilal_engine)
+            contentDescription = "Logo diagnostic moteur"
+        }, LinearLayout.LayoutParams(120, 120))
+        val heroText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        heroText.addView(text("DIAGNOSTIC AUTOMOBILE", 17f, Color.WHITE, true))
+        heroText.addView(text("MULTIMARQUE • OBD-II", 12f, cyan, true).apply {
+            setPadding(0, 8, 0, 0)
         })
-        hero.addView(text("▰▰   AUTOMOTIVE DIAGNOSTICS   ▰▰", 13f, Color.rgb(152, 205, 246)).apply { gravity = Gravity.CENTER })
+        heroRow.addView(heroText, LinearLayout.LayoutParams(0, -2, 1f))
+        hero.addView(heroRow)
+        hero.addView(text("Votre véhicule en toute clarté", 13f, Color.rgb(173, 204, 228)).apply {
+            setPadding(8, 12, 0, 0)
+        })
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
         status = text("●  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(27, 227, 158), true).apply {
             background = rounded(panel, Color.rgb(27, 227, 158))
