@@ -383,6 +383,7 @@ class MainActivity : Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
+            elevation = 10f
             setPadding(18, 20, 18, 20)
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(Color.rgb(6, 55, 103), Color.rgb(8, 20, 41), Color.rgb(40, 18, 52))
@@ -399,6 +400,7 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 0)
         })
         heroRow.addView(heroText, LinearLayout.LayoutParams(0, -2, 1f))
+        hero.addView(text("GARAGE DIGITAL  /  ÉDITION PREMIUM", 11f, cyan, true).apply { letterSpacing = .13f })
         hero.addView(heroRow)
         hero.addView(text("Votre diagnostic, une longueur d’avance.", 14f, Color.rgb(173, 204, 228), true).apply {
             setPadding(8, 12, 0, 0)
@@ -434,7 +436,8 @@ class MainActivity : Activity() {
                 brush.clearShadowLayer()
             }
         }
-        hero.addView(car, LinearLayout.LayoutParams(-1, 140))
+        hero.addView(car, LinearLayout.LayoutParams(-1, 180))
+        hero.addView(text("◆  MULTIMARQUE     ◆  OBD-II     ◆  BLUETOOTH", 11f, Color.rgb(139, 210, 245), true).apply { gravity = Gravity.CENTER })
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
         status = text("○  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(255, 178, 91), true).apply {
             background = rounded(panel, Color.rgb(255, 178, 91))
@@ -453,17 +456,21 @@ class MainActivity : Activity() {
         nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             background = rounded(panel, Color.rgb(37, 74, 109))
-            setPadding(2, 10, 2, 10)
+            setPadding(2, 12, 2, 12)
+            elevation = 12f
         }
         listOf("⌂\nAccueil", "▣\nVéhicule", "▥\nMesures", "▤\nRapport", "⚙\nRéglages").forEachIndexed { i, label ->
             nav.addView(text(label, 11f).apply {
                 gravity = Gravity.CENTER
-                setPadding(2, 7, 2, 7)
+                setPadding(2, 11, 2, 11)
                 setOnClickListener { showTab(i) }
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
         root.addView(nav)
         setContentView(root)
+        android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS.let { window.addFlags(it) }
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
         showTab(0)
     }
     private fun log(message: String) = runOnUiThread {
