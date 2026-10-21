@@ -171,6 +171,50 @@ class MainActivity : Activity() {
         })
     }
 
+    private fun brandLogo(name: String): TextView {
+        val monogram = when (name) {
+            "Peugeot" -> "♞"
+            "Renault" -> "◇"
+            "Citroën" -> "⌃⌃"
+            "Volkswagen" -> "VW"
+            "BMW" -> "BMW"
+            "Mercedes-Benz" -> "✦"
+            "Audi" -> "◎◎"
+            "Toyota" -> "Ⓣ"
+            "Ford" -> "Ford"
+            "Hyundai" -> "H"
+            "Kia" -> "KIA"
+            "Nissan" -> "N"
+            else -> name.take(2).uppercase()
+        }
+        return text(monogram, 17f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(12, 98, 163), Color.rgb(11, 24, 48))).apply {
+                cornerRadius = 18f
+                setStroke(2, cyan)
+            }
+        }
+    }
+    private fun brandGallery() {
+        section("CONSTRUCTEURS • ACCÈS RAPIDE")
+        listOf("Peugeot","Renault","Citroën","Volkswagen","BMW","Mercedes-Benz","Audi","Toyota","Ford","Hyundai","Kia","Nissan").chunked(4).forEach { names ->
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            names.forEach { name ->
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(5, 12, 5, 12)
+                    background = rounded(panel, blue, 17f)
+                    setOnClickListener { selectedMake = name; chooseVehicle() }
+                }
+                card.addView(brandLogo(name), LinearLayout.LayoutParams(72, 60))
+                card.addView(text(name, 10f, Color.WHITE, true).apply { gravity = Gravity.CENTER; setPadding(0, 7, 0, 0) })
+                line.addView(card, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(3, 3, 3, 3) })
+            }
+            content.addView(line)
+        }
+    }
     private fun rowAction(title: String, detail: String, color: Int = cyan, action: () -> Unit) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -197,6 +241,7 @@ class MainActivity : Activity() {
                 rowAction(if (selectedMake.isBlank()) "▣  Choisir mon véhicule" else "▣  $selectedMake $selectedModel",
                     if (selectedMake.isBlank()) "143 marques • modèle et année" else "Année $selectedYear • Modifier",
                     Color.rgb(42, 192, 255)) { chooseVehicle() }
+                brandGallery()
                 section("TABLEAU DE BORD")
                 rowAction("◉  Connexion ELM327", "Bluetooth Classic • appuyer pour choisir le boîtier", Color.rgb(18, 220, 156)) { connect() }
                 section("DIAGNOSTIC RAPIDE")
