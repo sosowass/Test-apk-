@@ -144,7 +144,8 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(panel, Color.rgb(10, 23, 43))).apply { cornerRadius = 28f; setStroke(2, color) }
-            setPadding(12, 20, 12, 20)
+            setPadding(12, 25, 12, 25)
+            elevation = 7f
             isClickable = true
             isFocusable = true
             setOnClickListener { fn() }
@@ -224,7 +225,8 @@ class MainActivity : Activity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 19, 20, 19)
-            background = rounded(panel, color, 22f)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(21, 43, 74), Color.rgb(9, 19, 40))).apply { cornerRadius = 24f; setStroke(2, color) }
+            elevation = 5f
             isClickable = true
             setOnClickListener { action() }
         }
@@ -370,7 +372,7 @@ class MainActivity : Activity() {
         })
         heroRow.addView(heroText, LinearLayout.LayoutParams(0, -2, 1f))
         hero.addView(heroRow)
-        hero.addView(text("Votre véhicule en toute clarté", 13f, Color.rgb(173, 204, 228)).apply {
+        hero.addView(text("Votre diagnostic, une longueur d’avance.", 14f, Color.rgb(173, 204, 228), true).apply {
             setPadding(8, 12, 0, 0)
         })
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
