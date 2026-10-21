@@ -22,6 +22,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Verifier le catalogue hors connexion
+        run: python3 scripts/verify-vehicle-catalog.py
       - name: Compiler APK, tests et lint
         shell: bash
         run: |
@@ -64,7 +66,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Bilal27000diag-0.6.1-APK
+          name: Bilal27000diag-0.6.2-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Enregistrer les captures consultables
@@ -80,13 +82,36 @@ jobs:
             try { parent = (await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch})).data.object.sha; }
             catch (e) { if (e.status !== 404) throw e; }
             const tree = [];
+            const base = parent ? (await github.rest.git.getCommit({owner, repo, commit_sha: parent})).data.tree.sha : undefined;
             for (const name of fs.readdirSync('screenshots').filter(n => n.endsWith('.webp'))) {
               const blob = await github.rest.git.createBlob({owner, repo, content: fs.readFileSync('screenshots/' + name).toString('base64'), encoding: 'base64'});
               tree.push({path: name, mode: '100644', type: 'blob', sha: blob.data.sha});
             }
-            const manifest = JSON.stringify({source_sha: context.sha, run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`, screenshots: tree.map(f => f.path)}, null, 2);
+            const verified = '${{ job.status }}' === 'success';
+            const manifest = JSON.stringify({source_sha: context.sha, run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`, verified, screenshots: tree.map(f => f.path)}, null, 2);
+            if (verified) {
+              const crypto = require('crypto'), cp = require('child_process');
+              const apkPath = 'app/build/outputs/apk/debug/app-debug.apk';
+              const data = fs.readFileSync(apkPath);
+              const version = JSON.parse(fs.readFileSync('app/build/outputs/apk/debug/output-metadata.json', 'utf8')).elements[0].versionName;
+              const sdk = process.env.ANDROID_HOME + '/build-tools';
+              const signerTool = fs.readdirSync(sdk).sort((a, b) => b.localeCompare(a, undefined, {numeric: true})).map(v => sdk + '/' + v + '/apksigner').find(p => fs.existsSync(p));
+              if (!signerTool) throw new Error('APK signature verifier unavailable');
+              const certificate = cp.execFileSync(signerTool, ['verify', '--verbose', '--print-certs', apkPath], {encoding: 'utf8'});
+              const match = certificate.match(/certificate SHA-256 digest:\s*([a-f0-9]{64})/i);
+              if (!match) throw new Error('Cannot read verified APK certificate digest');
+              const metadata = {version, source_sha: context.sha, build_run: context.runId, size: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex'), signer_sha256: match[1].toLowerCase(), updates_0_6_1: match[1].toLowerCase() === 'ae0c0ea270989e9110c6087f2cb5ef3daf836f41a6b29666595326780b680c5e'};
+              const blob = await github.rest.git.createBlob({owner, repo, encoding: 'base64', content: data.toString('base64')});
+              tree.push({path: 'Bilal27000diag-' + version + '.apk', mode: '100644', type: 'blob', sha: blob.data.sha});
+              tree.push({path: 'apk-verification.json', mode: '100644', type: 'blob', content: JSON.stringify(metadata, null, 2)});
+              const encoded = data.toString('base64');
+              for (let offset = 0, index = 0; offset < encoded.length; offset += 400000, index++) {
+                tree.push({path: 'transfer/' + version + '/apk-base64-' + index + '.txt', mode: '100644', type: 'blob', content: encoded.slice(offset, offset + 400000)});
+              }
+              core.info(JSON.stringify(metadata));
+            }
             tree.push({path: 'verification.json', mode: '100644', type: 'blob', content: manifest});
-            const created = await github.rest.git.createTree({owner, repo, tree});
+            const created = await github.rest.git.createTree({owner, repo, base_tree: base, tree});
             const commit = await github.rest.git.createCommit({owner, repo, message: 'Android emulator screenshots for ' + context.sha, tree: created.data.sha, parents: parent ? [parent] : []});
             if (parent) await github.rest.git.updateRef({owner, repo, ref: 'heads/' + branch, sha: commit.data.sha});
             else await github.rest.git.createRef({owner, repo, ref: 'refs/heads/' + branch, sha: commit.data.sha});

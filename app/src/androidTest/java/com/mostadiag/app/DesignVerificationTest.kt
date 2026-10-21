@@ -6,6 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.AutoCompleteTextView
+import android.view.inspector.WindowInspector
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -13,6 +15,8 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Android rendering and interaction checks. Never injects vehicle readings. */
 @RunWith(AndroidJUnit4::class)
@@ -127,6 +131,94 @@ class DesignVerificationTest {
             val profile = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
             scenario.onActivity { activity -> activity.window.decorView.findViewWithTag<View>("tab_1").performClick() }
             capture("${profile}_lifan_520_profile")
+        }
+        context.getSharedPreferences("vehicle", 0).edit().clear().commit()
+    }
+
+    @android.annotation.TargetApi(29)
+    @Test fun offlineCatalogSuggestionsAndManualEntry() {
+        val context = instrumentation.targetContext
+        val catalog = VehicleCatalog(context.assets)
+        assertTrue("International make coverage", catalog.makeCount >= 1900)
+        assertTrue("International model coverage", catalog.modelCount >= 48000)
+        assertEquals("Citroën", catalog.canonicalMake("  CITROEN  "))
+        assertEquals("Volkswagen", catalog.canonicalMake("VW"))
+        assertTrue(catalog.models("Renault").size > 100)
+        assertTrue(catalog.models("lifan").map { it.name }.containsAll(listOf("520", "520i", "620", "X50", "X60")))
+        assertTrue("No invented production years for reviewed names", catalog.referencedYears("Avatr", "06").isEmpty())
+        val years = catalog.yearSuggestions("Lifan", "520", 2026)
+        assertEquals(142, years.size)
+        assertTrue(years.containsAll(listOf("1886", "1950", "2008", "2026", "2027")))
+        assertTrue(catalog.models("Marque personnalisée absente").isEmpty())
+        assertEquals(years.toSet(), catalog.yearSuggestions("Marque personnalisée absente", "Modèle libre", 2026).toSet())
+
+        val filtered = VehicleSuggestionsAdapter(context, catalog.makes, VehicleCatalog.aliases)
+        for ((query, expected) in listOf("citroen" to "Citroën", "VW" to "Volkswagen", "MERCEDES" to "Mercedes-Benz")) {
+            val ready = CountDownLatch(1)
+            instrumentation.runOnMainSync { filtered.filter.filter(query) { ready.countDown() } }
+            assertTrue("Search filter completed", ready.await(10, TimeUnit.SECONDS))
+            assertTrue("Accent/case/alias search: $query", (0 until filtered.count).any { filtered.getItem(it) == expected })
+        }
+
+        context.getSharedPreferences("vehicle", 0).edit().clear().commit()
+        val profile = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            lateinit var make: AutoCompleteTextView
+            lateinit var model: AutoCompleteTextView
+            lateinit var year: AutoCompleteTextView
+            fun bindDialog() {
+                val root = WindowInspector.getGlobalWindowViews().first { it.findViewWithTag<View>("vehicle_make") != null }
+                make = root.findViewWithTag("vehicle_make")
+                model = root.findViewWithTag("vehicle_model")
+                year = root.findViewWithTag("vehicle_year")
+            }
+            fun complete(field: AutoCompleteTextView, query: String, choice: String) {
+                val ready = CountDownLatch(1)
+                scenario.onActivity {
+                    field.setText(query, false)
+                    (field.adapter as VehicleSuggestionsAdapter).filter.filter(query) { ready.countDown() }
+                }
+                assertTrue("Suggestion results ready: $query", ready.await(10, TimeUnit.SECONDS))
+                scenario.onActivity {
+                    field.requestFocus(); field.showDropDown()
+                    val position = (0 until field.adapter.count).first { field.adapter.getItem(it) == choice }
+                    field.listSelection = position
+                    field.performCompletion()
+                }
+            }
+            scenario.onActivity { activity ->
+                activity.window.decorView.findViewWithTag<View>("choose_vehicle").performClick()
+                bindDialog()
+            }
+            complete(make, "lif", "Lifan")
+            capture("${profile}_catalogue_modeles")
+            complete(model, "52", "520")
+            capture("${profile}_catalogue_annees")
+            scenario.onActivity { activity ->
+                assertEquals("Lifan", make.text.toString())
+                assertEquals("520", model.text.toString())
+                val save = year.rootView.findViewById<View>(android.R.id.button1)
+                year.dismissDropDown(); year.setText("9999", false); save.performClick()
+                assertNotNull("Invalid year keeps the form open", year.error)
+                assertEquals(0, activity.getSharedPreferences("vehicle", 0).getInt("year", 0))
+                year.setText("2008", false); save.performClick()
+                assertEquals(2008, activity.getSharedPreferences("vehicle", 0).getInt("year", 0))
+                assertEquals("520", activity.getSharedPreferences("vehicle", 0).getString("model", ""))
+            }
+            scenario.recreate()
+            scenario.onActivity { activity ->
+                assertTrue(descendants(activity.window.decorView).filterIsInstance<TextView>().any { it.text.contains("Lifan 520") })
+                activity.window.decorView.findViewWithTag<View>("choose_vehicle").performClick()
+                bindDialog()
+                make.setText("Marque locale", false)
+                assertEquals("Changing make clears the previous model", "", model.text.toString())
+                model.setText("Modèle personnalisé", false); year.setText("1972", false)
+                year.rootView.findViewById<View>(android.R.id.button1).performClick()
+                val prefs = activity.getSharedPreferences("vehicle", 0)
+                assertEquals("Marque locale", prefs.getString("make", ""))
+                assertEquals("Modèle personnalisé", prefs.getString("model", ""))
+                assertEquals(1972, prefs.getInt("year", 0))
+            }
         }
         context.getSharedPreferences("vehicle", 0).edit().clear().commit()
     }

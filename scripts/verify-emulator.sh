@@ -12,7 +12,7 @@ run_profile() {
     local profile_name="$1"
     adb shell am instrument -w -e profile "$profile_name" com.mostadiag.app.test/androidx.test.runner.AndroidJUnitRunner | tee "instrumentation-${profile_name}.txt"
     adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
-    grep -q 'OK (2 tests)' "instrumentation-${profile_name}.txt"
+    grep -q 'OK (3 tests)' "instrumentation-${profile_name}.txt"
 }
 run_profile phone
 adb shell wm size 640x1136

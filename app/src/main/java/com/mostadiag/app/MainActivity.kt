@@ -48,86 +48,133 @@ class MainActivity : Activity() {
     private var selectedMake = ""
     private var selectedModel = ""
     private var selectedYear = 0
-    private val makeOptions = listOf("Abarth","Acura","Aiways","Alfa Romeo","Alpine","AMC","Ariel","Aston Martin","Audi","Austin","Avatr","BAIC","Baojun","Bentley","Bestune","BMW","Borgward","Brilliance","Bugatti","Buick","BYD","Cadillac","Changan","Chery","Chevrolet","Chrysler","Citroën","Cupra","Dacia","Daewoo","DAF","Daihatsu","Datsun","Denza","De Tomaso","Dodge","Dongfeng","DS Automobiles","Eagle","Exeed","FAW","Ferrari","Fiat","Fisker","Ford","Forthing","Foton","GAC","Geely","Genesis","GMC","Great Wall","Haval","Holden","Honda","Hongqi","Hummer","Hyundai","IM Motors","Infiniti","Isuzu","Iveco","JAC","Jaecoo","Jaguar","Jeep","Jetour","JMC","Karma","Kia","Koenigsegg","Lada","Lamborghini","Lancia","Land Rover","Leapmotor","Lexus","Li Auto","Lifan","Lincoln","Lotus","Lucid","Lynk & Co","Mahindra","MAN","Maserati","Maxus","Maybach","Mazda","McLaren","Mercedes-Benz","Mercury","MG","Mini","Mitsubishi","Morgan","Neta","NIO","Nissan","Oldsmobile","Omoda","Opel","Ora","Pagani","Perodua","Peugeot","Plymouth","Polestar","Pontiac","Porsche","Proton","Ram","Renault","Rivian","Roewe","Rolls-Royce","Rover","Saab","Saturn","Scania","Seat","Seres","Skoda","Smart","SsangYong","Subaru","Suzuki","Tata","Tesla","Toyota","UAZ","Vauxhall","VinFast","Volkswagen","Volvo","Voyah","Wey","Wuling","Xiaomi Auto","XPeng","Yangwang","Zeekr","Zotye","Autre marque")
-    private val modelSuggestions = mapOf(
-        "Lifan" to listOf("520"),
-        "Peugeot" to listOf("208","308","2008","3008","5008","508","206","207","307","407","Partner"),
-        "Renault" to listOf("Clio","Megane","Twingo","Captur","Scenic","Kadjar","Austral","Kangoo","Trafic"),
-        "Citroën" to listOf("C3","C4","C5","Berlingo","Jumpy","Saxo"),
-        "Volkswagen" to listOf("Golf","Polo","Passat","Tiguan","Touareg","Touran"),
-        "BMW" to listOf("Série 1","Série 3","Série 5","X1","X3","X5"),
-        "Audi" to listOf("A1","A3","A4","A6","Q3","Q5","Q7"),
-        "Toyota" to listOf("Yaris","Corolla","RAV4","C-HR","Prius","Hilux"),
-        "Ford" to listOf("Fiesta","Focus","Kuga","Puma","Ranger"),
-        "Hyundai" to listOf("i10","i20","i30","Tucson","Kona"),
-        "Kia" to listOf("Picanto","Ceed","Sportage","Sorento"),
-        "Dacia" to listOf("Sandero","Duster","Logan","Jogger"),
-        "Seat" to listOf("Ibiza","Leon","Ateca"),
-        "Tesla" to listOf("Model 3","Model Y","Model S","Model X")
-    )
+    private val vehicleCatalog by lazy { VehicleCatalog(assets) }
     private fun chooseVehicle() {
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(12), dp(24), dp(8))
-        }
-        val make = AutoCompleteTextView(this).apply {
-            hint = "Rechercher une marque"
+        val form = column().apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
+        fun field(label: String, fieldTag: String) = AutoCompleteTextView(this).apply {
+            tag = fieldTag
+            hint = label
+            contentDescription = label
             threshold = 1
             setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(muted)
+            textSize = 16f
+            minHeight = dp(52)
+            dropDownHeight = dp(200)
+            setDropDownBackgroundDrawable(rounded(panel))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        val make = field("Rechercher ou saisir la marque", "vehicle_make").apply {
             setText(selectedMake)
-            setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, makeOptions))
+            setAdapter(VehicleSuggestionsAdapter(this@MainActivity, vehicleCatalog.makes, VehicleCatalog.aliases))
         }
-        val model = AutoCompleteTextView(this).apply {
-            hint = "Rechercher ou saisir le modèle"
-            setSingleLine(true)
-            setText(selectedModel)
-            threshold = 1
+        val model = field("Rechercher ou saisir le modèle", "vehicle_model").apply { setText(selectedModel) }
+        val year = field("Rechercher ou saisir l’année", "vehicle_year").apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            if (selectedYear > 0) setText(selectedYear.toString())
+        }
+        val modelHelp = text("", 11f, muted).apply { setPadding(dp(4), dp(4), dp(4), dp(10)) }
+        val yearHelp = text("Toutes les années restent disponibles. Vérifiez l’année sur la carte grise.", 11f, muted)
+        var currentMake = vehicleCatalog.canonicalMake(make.text.toString()) ?: make.text.toString().trim()
+        fun refreshYears() {
+            val makeName = make.text.toString()
+            val modelName = model.text.toString()
+            val known = vehicleCatalog.referencedYears(makeName, modelName)
+            year.setAdapter(VehicleSuggestionsAdapter(this, vehicleCatalog.yearSuggestions(makeName, modelName)))
+            yearHelp.text = if (known.isEmpty())
+                "Toutes les années de 1886 à l’année prochaine sont proposées. Vérifiez la carte grise."
+            else "Années référencées en premier, puis toutes les autres. Vérifiez l’année sur la carte grise."
         }
         fun refreshModels() {
-            val options = modelSuggestions.entries.firstOrNull {
-                it.key.equals(make.text.toString().trim(), ignoreCase = true)
-            }?.value ?: emptyList()
-            model.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, options))
+            val options = vehicleCatalog.models(make.text.toString())
+            model.setAdapter(VehicleSuggestionsAdapter(this, options.map { it.name }))
+            modelHelp.text = if (options.isEmpty()) "Saisie libre : indiquez le modèle de votre véhicule."
+                else "${options.size} modèles proposés · saisie libre disponible"
+            refreshYears()
         }
-        model.setOnClickListener { refreshModels(); model.showDropDown() }
+        fun watch(field: AutoCompleteTextView, changed: () -> Unit) {
+            field.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { changed() }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+        }
+        watch(make) {
+            val nextMake = vehicleCatalog.canonicalMake(make.text.toString()) ?: make.text.toString().trim()
+            if (!nextMake.equals(currentMake, ignoreCase = true)) {
+                currentMake = nextMake
+                model.setText("", false)
+                refreshModels()
+            }
+        }
+        watch(model) { refreshYears() }
+        make.setOnClickListener { make.showDropDown() }
+        model.setOnClickListener { model.showDropDown() }
+        year.setOnClickListener { year.showDropDown() }
         make.setOnItemClickListener { _, _, _, _ ->
-            model.setText("")
             refreshModels()
+            model.requestFocus()
             model.showDropDown()
         }
-        refreshModels()
-        val year = NumberPicker(this).apply {
-            minValue = 1950
-            maxValue = 2027
-            value = if (selectedYear in 1950..2027) selectedYear else 2026
-            wrapSelectorWheel = false
+        model.setOnItemClickListener { _, _, _, _ ->
+            refreshYears()
+            year.requestFocus()
+            year.showDropDown()
         }
-        form.addView(text("MARQUE", 12f, cyan, true))
-        form.addView(make)
-        form.addView(text("MODÈLE", 12f, cyan, true))
-        form.addView(model)
-        form.addView(text("ANNÉE", 12f, cyan, true))
-        form.addView(year)
-        val formScroll = ScrollView(this).apply { addView(form) }
-        AlertDialog.Builder(this).setTitle("Sélection du véhicule")
-            .setView(formScroll)
+        refreshModels()
+        form.addView(text("${vehicleCatalog.makeCount} marques · ${vehicleCatalog.modelCount} modèles hors connexion", 12f, cyan, true).apply {
+            setPadding(0, 0, 0, dp(14))
+        })
+        form.addView(text("MARQUE", 11f, cyan, true)); form.addView(make)
+        form.addView(text("MODÈLE", 11f, cyan, true).apply { setPadding(0, dp(12), 0, 0) }); form.addView(model)
+        form.addView(modelHelp)
+        form.addView(text("ANNÉE DU VÉHICULE", 11f, cyan, true)); form.addView(year)
+        form.addView(yearHelp.apply { setPadding(dp(4), dp(6), dp(4), dp(6)) })
+        val dialog = AlertDialog.Builder(this).setTitle("Votre véhicule")
+            .setView(ScrollView(this).apply { addView(form) })
             .setNegativeButton("Annuler", null)
-            .setPositiveButton("Enregistrer") { _, _ ->
+            .setPositiveButton("Enregistrer", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val makeName = make.text.toString().trim()
                 val modelName = model.text.toString().trim()
-                if (makeName.isBlank() || modelName.isBlank()) {
-                    Toast.makeText(this, "Renseignez la marque et le modèle", Toast.LENGTH_LONG).show()
-                } else {
-                    selectedMake = makeName
-                    selectedModel = modelName
-                    selectedYear = year.value
-                    getSharedPreferences("vehicle", MODE_PRIVATE).edit()
-                        .putString("make", selectedMake)
-                        .putString("model", selectedModel)
-                        .putInt("year", selectedYear).apply()
-                    showTab(1)
+                val yearNumber = year.text.toString().trim().toIntOrNull()
+                val maxYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 1
+                when {
+                    makeName.isBlank() -> { make.error = "Renseignez la marque"; make.requestFocus() }
+                    modelName.isBlank() -> { model.error = "Renseignez le modèle"; model.requestFocus() }
+                    yearNumber == null || yearNumber !in 1886..maxYear -> {
+                        year.error = "Saisissez une année entre 1886 et $maxYear"; year.requestFocus()
+                    }
+                    else -> {
+                        selectedMake = vehicleCatalog.canonicalMake(makeName) ?: makeName
+                        selectedModel = vehicleCatalog.models(selectedMake).firstOrNull {
+                            VehicleCatalog.normalize(it.name) == VehicleCatalog.normalize(modelName)
+                        }?.name ?: modelName
+                        selectedYear = yearNumber
+                        getSharedPreferences("vehicle", MODE_PRIVATE).edit()
+                            .putString("make", selectedMake).putString("model", selectedModel)
+                            .putInt("year", selectedYear).apply()
+                        dialog.dismiss()
+                        showTab(1)
+                    }
                 }
-            }.show()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showCatalogCredits() {
+        val credits = text(assets.open("vehicle-catalog/credits.txt").bufferedReader().use { it.readText() }, 12f, muted).apply {
+            setPadding(dp(20), dp(12), dp(20), dp(16))
+            setTextIsSelectable(true)
+            android.text.util.Linkify.addLinks(this, android.text.util.Linkify.WEB_URLS)
+            setLinkTextColor(cyan)
+        }
+        AlertDialog.Builder(this).setTitle("Sources du catalogue")
+            .setView(ScrollView(this).apply { addView(credits) })
+            .setPositiveButton("Fermer", null).show()
     }
 
     private lateinit var content: LinearLayout
@@ -247,6 +294,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(icon("arrow", muted, 20))
         }
+        card.tag = "choose_vehicle"
         actionable(card) { chooseVehicle() }; add(card)
     }
     private fun brandGallery() {
@@ -261,7 +309,7 @@ class MainActivity : Activity() {
             }
         }
         grid(cards, if (wide) 6 else if (largeText) 2 else 3)
-        rowAction("Une autre marque ?", "Le catalogue complet reste accessible par la recherche.", "car") { chooseVehicle() }
+        rowAction("Rechercher toutes les marques", "${vehicleCatalog.makeCount} marques · ${vehicleCatalog.modelCount} modèles hors connexion", "car") { chooseVehicle() }
     }
     private fun grid(items: List<View>, columns: Int = if (wide) 4 else 2) {
         items.chunked(columns).forEach { group ->
@@ -455,6 +503,7 @@ class MainActivity : Activity() {
                         .setMessage("Illustration automobile générée pour Bilal27000diag. Logos vectoriels issus de Simple Icons (CC0), intégrés à l’APK. Les marques appartiennent à leurs propriétaires ; aucune affiliation n’est revendiquée. Pour les autres marques, un pictogramme automobile est utilisé.")
                         .setPositiveButton("Fermer", null).show()
                 }
+                rowAction("Catalogue véhicules", "Vehicle data by VehiclesDB · sources et licences", "car") { showCatalogCredits() }
                 section("BONNES PRATIQUES")
                 note("À utiliser à l’arrêt", "Préparez et consultez votre diagnostic véhicule stationné. N’utilisez pas l’application pendant la conduite.", amber)
             }
