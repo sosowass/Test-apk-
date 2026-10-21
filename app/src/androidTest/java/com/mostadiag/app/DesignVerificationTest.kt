@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.AutoCompleteTextView
+import android.widget.ListView
 import android.view.inspector.WindowInspector
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -183,9 +184,17 @@ class DesignVerificationTest {
                 assertTrue("Suggestion results ready: $query", ready.await(10, TimeUnit.SECONDS))
                 scenario.onActivity {
                     field.requestFocus(); field.showDropDown()
-                    val position = (0 until field.adapter.count).first { field.adapter.getItem(it) == choice }
-                    field.listSelection = position
-                    field.performCompletion()
+                }
+                instrumentation.waitForIdleSync()
+                scenario.onActivity {
+                    val position = (0 until field.adapter.count).indexOfFirst { field.adapter.getItem(it) == choice }
+                    assertTrue("Expected $choice in ${field.tag} suggestions for $query", position >= 0)
+                    val list = WindowInspector.getGlobalWindowViews().flatMap { descendants(it) }
+                        .filterIsInstance<ListView>().first { it.adapter === field.adapter }
+                    // AutoCompleteTextView.performCompletion() relies on keyboard selection,
+                    // which is absent in touch mode. Exercise the actual dropdown row click.
+                    list.performItemClick(list.getChildAt(position - list.firstVisiblePosition), position, field.adapter.getItemId(position))
+                    assertEquals("Dropdown selection", choice, field.text.toString())
                 }
             }
             scenario.onActivity { activity ->

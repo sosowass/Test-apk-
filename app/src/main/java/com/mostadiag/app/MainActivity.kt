@@ -163,6 +163,7 @@ class MainActivity : Activity() {
             }
         }
         dialog.show()
+        dialog.window?.setBackgroundDrawable(rounded(panel))
     }
 
     private fun showCatalogCredits() {
@@ -174,7 +175,7 @@ class MainActivity : Activity() {
         }
         AlertDialog.Builder(this).setTitle("Sources du catalogue")
             .setView(ScrollView(this).apply { addView(credits) })
-            .setPositiveButton("Fermer", null).show()
+            .setPositiveButton("Fermer", null).show().window?.setBackgroundDrawable(rounded(panel))
     }
 
     private lateinit var content: LinearLayout
