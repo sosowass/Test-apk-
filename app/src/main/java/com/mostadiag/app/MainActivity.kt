@@ -244,6 +244,7 @@ class MainActivity : Activity() {
     }
     private fun brandGallery() {
         section("CONSTRUCTEURS • LOGOS")
+        content.addView(text("Choisissez une marque pour explorer ses modèles", 12f, Color.rgb(169, 196, 224)))
         val brands = listOf(
             "Peugeot" to "peugeot", "Renault" to "renault", "Citroën" to "citroen",
             "Volkswagen" to "volkswagen", "BMW" to "bmw", "Mercedes-Benz" to "mercedes",
@@ -274,6 +275,7 @@ class MainActivity : Activity() {
                     loadDataWithBaseURL("https://cdn.simpleicons.org/", html, "text/html", "UTF-8", null)
                 }
                 card.addView(logo, LinearLayout.LayoutParams(-1, 56))
+                card.elevation = 5f
                 card.addView(text(name, 10f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
                 line.addView(card, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(3, 3, 3, 3) })
             }
