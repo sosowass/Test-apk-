@@ -1,6 +1,6 @@
 {
-  "source_sha": "a5ed1368c93bd44d89d52287764da835f641152a",
-  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39630019186",
+  "source_sha": "99c8645f2041254d6b3015ab0b4a73480a0161f7",
+  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39631001669",
   "verified": false,
   "screenshots": [
     "phone_1_accueil.webp",
@@ -11,6 +11,7 @@
     "phone_3_mesures_bas.webp",
     "phone_4_rapport.webp",
     "phone_5_parametres.webp",
+    "phone_catalogue_annees.webp",
     "phone_catalogue_modeles.webp",
     "phone_lifan_520_profile.webp"
   ]
