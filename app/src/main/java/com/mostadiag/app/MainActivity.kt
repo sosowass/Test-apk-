@@ -258,7 +258,7 @@ class MainActivity : Activity() {
     }
     private fun grid(items: List<View>, columns: Int = if (wide) 4 else 2) {
         items.chunked(columns).forEach { group ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; baselineAligned = false }
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
             group.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i > 0) marginStart = dp(8) }) }
             repeat(columns - group.size) { row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(8) }) }
             add(row, 8)
