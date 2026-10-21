@@ -1,6 +1,6 @@
 {
-  "source_sha": "8c08de0a82b73649dfbf89bd11eaf100c2888052",
-  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39614145287",
+  "source_sha": "cb85a6d597107143176350b7da8efbe798d613fe",
+  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39624907927",
   "screenshots": [
     "compact_1_accueil.webp",
     "compact_1_accueil_bas.webp",
@@ -10,6 +10,7 @@
     "compact_3_mesures_bas.webp",
     "compact_4_rapport.webp",
     "compact_5_parametres.webp",
+    "compact_lifan_520_profile.webp",
     "large_text_1_accueil.webp",
     "large_text_1_accueil_bas.webp",
     "large_text_2_vehicule.webp",
@@ -18,6 +19,7 @@
     "large_text_3_mesures_bas.webp",
     "large_text_4_rapport.webp",
     "large_text_5_parametres.webp",
+    "large_text_lifan_520_profile.webp",
     "phone_1_accueil.webp",
     "phone_1_accueil_bas.webp",
     "phone_2_vehicule.webp",
@@ -26,6 +28,7 @@
     "phone_3_mesures_bas.webp",
     "phone_4_rapport.webp",
     "phone_5_parametres.webp",
+    "phone_lifan_520_profile.webp",
     "tablet_1_accueil.webp",
     "tablet_1_accueil_bas.webp",
     "tablet_2_vehicule.webp",
@@ -33,6 +36,7 @@
     "tablet_3_mesures.webp",
     "tablet_3_mesures_bas.webp",
     "tablet_4_rapport.webp",
-    "tablet_5_parametres.webp"
+    "tablet_5_parametres.webp",
+    "tablet_lifan_520_profile.webp"
   ]
 }
