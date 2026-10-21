@@ -135,35 +135,33 @@ class MainActivity : Activity() {
             .setView(ScrollView(this).apply { addView(form) })
             .setNegativeButton("Annuler", null)
             .setPositiveButton("Enregistrer", null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val makeName = make.text.toString().trim()
-                val modelName = model.text.toString().trim()
-                val yearNumber = year.text.toString().trim().toIntOrNull()
-                val maxYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 1
-                when {
-                    makeName.isBlank() -> { make.error = "Renseignez la marque"; make.requestFocus() }
-                    modelName.isBlank() -> { model.error = "Renseignez le modèle"; model.requestFocus() }
-                    yearNumber == null || yearNumber !in 1886..maxYear -> {
-                        year.error = "Saisissez une année entre 1886 et $maxYear"; year.requestFocus()
-                    }
-                    else -> {
-                        selectedMake = vehicleCatalog.canonicalMake(makeName) ?: makeName
-                        selectedModel = vehicleCatalog.models(selectedMake).firstOrNull {
-                            VehicleCatalog.normalize(it.name) == VehicleCatalog.normalize(modelName)
-                        }?.name ?: modelName
-                        selectedYear = yearNumber
-                        getSharedPreferences("vehicle", MODE_PRIVATE).edit()
-                            .putString("make", selectedMake).putString("model", selectedModel)
-                            .putInt("year", selectedYear).apply()
-                        dialog.dismiss()
-                        showTab(1)
-                    }
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(rounded(panel))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val makeName = make.text.toString().trim()
+            val modelName = model.text.toString().trim()
+            val yearNumber = year.text.toString().trim().toIntOrNull()
+            val maxYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 1
+            when {
+                makeName.isBlank() -> { make.error = "Renseignez la marque"; make.requestFocus() }
+                modelName.isBlank() -> { model.error = "Renseignez le modèle"; model.requestFocus() }
+                yearNumber == null || yearNumber !in 1886..maxYear -> {
+                    year.error = "Saisissez une année entre 1886 et $maxYear"; year.requestFocus()
+                }
+                else -> {
+                    selectedMake = vehicleCatalog.canonicalMake(makeName) ?: makeName
+                    selectedModel = vehicleCatalog.models(selectedMake).firstOrNull {
+                        VehicleCatalog.normalize(it.name) == VehicleCatalog.normalize(modelName)
+                    }?.name ?: modelName
+                    selectedYear = yearNumber
+                    getSharedPreferences("vehicle", MODE_PRIVATE).edit()
+                        .putString("make", selectedMake).putString("model", selectedModel)
+                        .putInt("year", selectedYear).apply()
+                    dialog.dismiss()
+                    showTab(1)
                 }
             }
         }
-        dialog.show()
-        dialog.window?.setBackgroundDrawable(rounded(panel))
     }
 
     private fun showCatalogCredits() {
