@@ -3,6 +3,11 @@ package com.mostadiag.app
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
@@ -404,18 +409,67 @@ class MainActivity : Activity() {
         history.append(timestamp).append("  ").append(message).append("\n\n")
         results.text = history.toString()
     }
+    private var receiver: BroadcastReceiver? = null
     private fun connect() {
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1); return
+        val permissions = if (Build.VERSION.SDK_INT >= 31)
+            arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 10); return }
+        val devices = linkedMapOf<String, BluetoothDevice>()
+        val labels = mutableListOf<String>()
+        val listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, labels)
+        val list = ListView(this).apply { adapter = listAdapter }
+        fun add(d: BluetoothDevice) {
+            if (devices.containsKey(d.address)) return
+            devices[d.address] = d
+            labels.add((d.name ?: "Bluetooth") + " • " + d.address)
+            listAdapter.notifyDataSetChanged()
         }
-        val devices = adapter?.bondedDevices?.toList() ?: emptyList()
-        if (devices.isEmpty()) { log("Associez d'abord votre boîtier OBD2 dans les paramètres Bluetooth."); return }
-        val names = devices.map { "${it.name ?: "Bluetooth"} — ${it.address}" }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Choisir un boîtier OBD2").setItems(names) { _, index ->
+        adapter?.bondedDevices?.forEach { add(it) }
+        val dialog = AlertDialog.Builder(this).setTitle("Rechercher un ELM327")
+            .setView(list).setNegativeButton("Fermer", null).create()
+        fun cleanup() {
+            try { adapter?.cancelDiscovery() } catch (_: Exception) {}
+            receiver?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
+            receiver = null
+        }
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val device = if (Build.VERSION.SDK_INT >= 33)
+                    intent?.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                else @Suppress("DEPRECATION") intent?.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                if (device != null && intent?.action == BluetoothDevice.ACTION_FOUND) add(device)
+                if (device != null && intent?.action == BluetoothDevice.ACTION_BOND_STATE_CHANGED &&
+                    device.bondState == BluetoothDevice.BOND_BONDED) {
+                    cleanup(); dialog.dismiss(); connectDevice(device)
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(receiver, filter)
+        dialog.setOnDismissListener { cleanup() }
+        list.setOnItemClickListener { _, _, position, _ ->
+            val device = devices.values.elementAt(position)
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                cleanup(); dialog.dismiss(); connectDevice(device)
+            } else {
+                if (!device.createBond()) Toast.makeText(this, "Appairage impossible", Toast.LENGTH_LONG).show()
+                else Toast.makeText(this, "Confirmez le code PIN si demandé", Toast.LENGTH_LONG).show()
+            }
+        }
+        dialog.show()
+        adapter?.startDiscovery()
+    }
+    private fun connectDevice(target: BluetoothDevice) {
             thread {
                 try {
                     socket?.close()
-                    val device = devices[index]
+                    val device = target
                     val s = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                     adapter?.cancelDiscovery()
                     s.connect()
@@ -435,8 +489,8 @@ class MainActivity : Activity() {
                     log("Échec de connexion : ${e.message}")
                 }
             }
-        }.show()
     }
+
     @Synchronized private fun command(cmd: String): String {
         val out = output ?: error("Boîtier non connecté")
         val inp = input ?: error("Boîtier non connecté")
@@ -493,5 +547,5 @@ class MainActivity : Activity() {
             catch (e: Exception) { log("Erreur : ${e.message}") }
         }
     }
-    override fun onDestroy() { try { socket?.close() } catch (_:Exception) {}; super.onDestroy() }
+    override fun onDestroy() { receiver?.let { try { unregisterReceiver(it) } catch (_:Exception) {} }; try { socket?.close() } catch (_:Exception) {}; super.onDestroy() }
 }
