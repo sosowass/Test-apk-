@@ -41,26 +41,7 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            mkdir -p screenshots
-            adb shell settings put global window_animation_scale 0
-            adb shell settings put global transition_animation_scale 0
-            adb shell settings put global animator_duration_scale 0
-            gradle --no-daemon --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.profile=phone
-            adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
-            adb shell wm size 640x1136
-            adb shell wm density 320
-            gradle --no-daemon --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.profile=compact
-            adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
-            adb shell wm size 1600x2560
-            adb shell wm density 320
-            gradle --no-daemon --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.profile=tablet
-            adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
-            adb shell wm size 1080x1920
-            adb shell wm density 420
-            adb shell settings put system font_scale 1.5
-            gradle --no-daemon --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.profile=large_text
-            adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
+          script: bash scripts/verify-emulator.sh
       - name: Collecter les erreurs Android
         if: failure()
         run: |
@@ -73,6 +54,7 @@ jobs:
           name: Bilal27000diag-verification
           path: |
             build-log.txt
+            instrumentation-*.txt
             android-logcat.txt
             screenshots/
             app/build/reports/
