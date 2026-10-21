@@ -375,6 +375,38 @@ class MainActivity : Activity() {
         hero.addView(text("Votre diagnostic, une longueur d’avance.", 14f, Color.rgb(173, 204, 228), true).apply {
             setPadding(8, 12, 0, 0)
         })
+        val car = object : View(this) {
+            private val brush = android.graphics.Paint(3)
+            override fun onDraw(c: android.graphics.Canvas) {
+                val w = width.toFloat(); val h = height.toFloat()
+                val outline = android.graphics.Path().apply {
+                    moveTo(w * .07f, h * .70f)
+                    lineTo(w * .13f, h * .48f)
+                    lineTo(w * .31f, h * .42f)
+                    lineTo(w * .43f, h * .20f)
+                    lineTo(w * .68f, h * .20f)
+                    lineTo(w * .81f, h * .43f)
+                    lineTo(w * .92f, h * .50f)
+                    lineTo(w * .95f, h * .70f)
+                    close()
+                }
+                brush.style = android.graphics.Paint.Style.FILL
+                brush.shader = android.graphics.LinearGradient(0f, 0f, w, h,
+                    Color.rgb(34, 110, 178), Color.rgb(4, 12, 30), android.graphics.Shader.TileMode.CLAMP)
+                c.drawPath(outline, brush)
+                brush.shader = null
+                brush.style = android.graphics.Paint.Style.STROKE
+                brush.strokeWidth = 3f
+                brush.color = Color.rgb(76, 204, 255)
+                brush.setShadowLayer(10f, 0f, 0f, Color.CYAN)
+                c.drawPath(outline, brush)
+                brush.strokeWidth = 7f
+                c.drawLine(w * .12f, h * .58f, w * .29f, h * .58f, brush)
+                c.drawLine(w * .73f, h * .58f, w * .90f, h * .58f, brush)
+                brush.clearShadowLayer()
+            }
+        }
+        hero.addView(car, LinearLayout.LayoutParams(-1, 140))
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
         status = text("○  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(255, 178, 91), true).apply {
             background = rounded(panel, Color.rgb(255, 178, 91))
