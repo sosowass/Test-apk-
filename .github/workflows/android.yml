@@ -63,7 +63,9 @@ jobs:
             adb pull /sdcard/Android/data/com.mostadiag.app/files/screenshots/. screenshots/
       - name: Collecter les erreurs Android
         if: failure()
-        run: timeout 10s adb logcat -d > android-logcat.txt || true
+        run: |
+          cat app/build/reports/lint-results-debug.txt || true
+          timeout 10s adb logcat -d > android-logcat.txt || true
       - name: Publier les preuves visuelles et rapports
         if: always()
         uses: actions/upload-artifact@v4
@@ -84,18 +86,19 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Enregistrer les captures consultables
-        if: success()
+        if: always()
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
+            if (!fs.existsSync('screenshots') || fs.readdirSync('screenshots').length === 0) return;
             const owner = context.repo.owner, repo = context.repo.repo;
             const branch = 'codex/design-evidence';
             let parent = null;
             try { parent = (await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch})).data.object.sha; }
             catch (e) { if (e.status !== 404) throw e; }
             const tree = [];
-            for (const name of fs.readdirSync('screenshots').filter(n => n.endsWith('.png'))) {
+            for (const name of fs.readdirSync('screenshots').filter(n => n.endsWith('.webp'))) {
               const blob = await github.rest.git.createBlob({owner, repo, content: fs.readFileSync('screenshots/' + name).toString('base64'), encoding: 'base64'});
               tree.push({path: name, mode: '100644', type: 'blob', sha: blob.data.sha});
             }

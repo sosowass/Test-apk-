@@ -25,7 +25,7 @@ class DesignVerificationTest {
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull("Android screenshot available", bitmap)
         val folder = File(instrumentation.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-        File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(folder, "$name.webp").outputStream().use { bitmap.compress(Bitmap.CompressFormat.WEBP, 90, it) }
         bitmap.recycle()
     }
     @Test fun fiveScreensRemainUsableWithoutVehicleData() {
@@ -41,6 +41,7 @@ class DesignVerificationTest {
                     assertTrue(tab.performClick())
                 }
                 instrumentation.waitForIdleSync()
+                capture("${profile}_${index + 1}_$name")
                 scenario.onActivity { activity ->
                     val all = descendants(activity.window.decorView)
                     val text = all.filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
@@ -60,7 +61,6 @@ class DesignVerificationTest {
                         assertTrue("Horizontal overflow: ${view.javaClass.simpleName}", location[0] >= -1 && location[0] + view.width <= screenWidth + 1)
                     }
                 }
-                capture("${profile}_${index + 1}_$name")
                 if (index in 0..2) {
                     scenario.onActivity { activity ->
                         val scroll = descendants(activity.window.decorView).filterIsInstance<ScrollView>().first()

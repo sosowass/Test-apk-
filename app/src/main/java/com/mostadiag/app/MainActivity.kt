@@ -31,6 +31,9 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 
+// Legacy Bluetooth entry point requests permissions centrally in connect().
+// Lint cannot follow its dynamically assembled permission list; preserve the OBD implementation.
+@android.annotation.SuppressLint("MissingPermission")
 class MainActivity : Activity() {
     private var socket: BluetoothSocket? = null
     private var input: InputStream? = null
