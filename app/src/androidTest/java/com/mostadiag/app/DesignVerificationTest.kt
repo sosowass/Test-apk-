@@ -82,7 +82,7 @@ class DesignVerificationTest {
     }
     @Test fun offlineBrandLogosAndVehicleProfile() {
         val context = instrumentation.targetContext
-        context.getSharedPreferences("vehicle", 0).edit().putString("make", "Peugeot").putString("model", "308").putInt("year", 2020).commit()
+        context.getSharedPreferences("vehicle", 0).edit().putString("make", "Lifan").putString("model", "520").putInt("year", 2020).commit()
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
             scenario.onActivity { activity ->
                 val logos = listOf(
@@ -121,9 +121,12 @@ class DesignVerificationTest {
                     bitmap.recycle()
                 }
                 val texts = descendants(activity.window.decorView).filterIsInstance<TextView>().joinToString(" ") { it.text.toString() }
-                assertTrue(texts.contains("Peugeot 308"))
+                assertTrue(texts.contains("Lifan 520"))
                 assertTrue(texts.contains("Profil renseigné manuellement"))
             }
+            val profile = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
+            scenario.onActivity { activity -> activity.window.decorView.findViewWithTag<View>("tab_1").performClick() }
+            capture("${profile}_lifan_520_profile")
         }
         context.getSharedPreferences("vehicle", 0).edit().clear().commit()
     }

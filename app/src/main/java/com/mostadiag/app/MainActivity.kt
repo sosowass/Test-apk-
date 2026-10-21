@@ -48,8 +48,9 @@ class MainActivity : Activity() {
     private var selectedMake = ""
     private var selectedModel = ""
     private var selectedYear = 0
-    private val makeOptions = listOf("Abarth","Acura","Aiways","Alfa Romeo","Alpine","AMC","Ariel","Aston Martin","Audi","Austin","Avatr","BAIC","Baojun","Bentley","Bestune","BMW","Borgward","Brilliance","Bugatti","Buick","BYD","Cadillac","Changan","Chery","Chevrolet","Chrysler","Citroën","Cupra","Dacia","Daewoo","DAF","Daihatsu","Datsun","Denza","De Tomaso","Dodge","Dongfeng","DS Automobiles","Eagle","Exeed","FAW","Ferrari","Fiat","Fisker","Ford","Forthing","Foton","GAC","Geely","Genesis","GMC","Great Wall","Haval","Holden","Honda","Hongqi","Hummer","Hyundai","IM Motors","Infiniti","Isuzu","Iveco","JAC","Jaecoo","Jaguar","Jeep","Jetour","JMC","Karma","Kia","Koenigsegg","Lada","Lamborghini","Lancia","Land Rover","Leapmotor","Lexus","Li Auto","Lincoln","Lotus","Lucid","Lynk & Co","Mahindra","MAN","Maserati","Maxus","Maybach","Mazda","McLaren","Mercedes-Benz","Mercury","MG","Mini","Mitsubishi","Morgan","Neta","NIO","Nissan","Oldsmobile","Omoda","Opel","Ora","Pagani","Perodua","Peugeot","Plymouth","Polestar","Pontiac","Porsche","Proton","Ram","Renault","Rivian","Roewe","Rolls-Royce","Rover","Saab","Saturn","Scania","Seat","Seres","Skoda","Smart","SsangYong","Subaru","Suzuki","Tata","Tesla","Toyota","UAZ","Vauxhall","VinFast","Volkswagen","Volvo","Voyah","Wey","Wuling","Xiaomi Auto","XPeng","Yangwang","Zeekr","Zotye","Autre marque")
+    private val makeOptions = listOf("Abarth","Acura","Aiways","Alfa Romeo","Alpine","AMC","Ariel","Aston Martin","Audi","Austin","Avatr","BAIC","Baojun","Bentley","Bestune","BMW","Borgward","Brilliance","Bugatti","Buick","BYD","Cadillac","Changan","Chery","Chevrolet","Chrysler","Citroën","Cupra","Dacia","Daewoo","DAF","Daihatsu","Datsun","Denza","De Tomaso","Dodge","Dongfeng","DS Automobiles","Eagle","Exeed","FAW","Ferrari","Fiat","Fisker","Ford","Forthing","Foton","GAC","Geely","Genesis","GMC","Great Wall","Haval","Holden","Honda","Hongqi","Hummer","Hyundai","IM Motors","Infiniti","Isuzu","Iveco","JAC","Jaecoo","Jaguar","Jeep","Jetour","JMC","Karma","Kia","Koenigsegg","Lada","Lamborghini","Lancia","Land Rover","Leapmotor","Lexus","Li Auto","Lifan","Lincoln","Lotus","Lucid","Lynk & Co","Mahindra","MAN","Maserati","Maxus","Maybach","Mazda","McLaren","Mercedes-Benz","Mercury","MG","Mini","Mitsubishi","Morgan","Neta","NIO","Nissan","Oldsmobile","Omoda","Opel","Ora","Pagani","Perodua","Peugeot","Plymouth","Polestar","Pontiac","Porsche","Proton","Ram","Renault","Rivian","Roewe","Rolls-Royce","Rover","Saab","Saturn","Scania","Seat","Seres","Skoda","Smart","SsangYong","Subaru","Suzuki","Tata","Tesla","Toyota","UAZ","Vauxhall","VinFast","Volkswagen","Volvo","Voyah","Wey","Wuling","Xiaomi Auto","XPeng","Yangwang","Zeekr","Zotye","Autre marque")
     private val modelSuggestions = mapOf(
+        "Lifan" to listOf("520"),
         "Peugeot" to listOf("208","308","2008","3008","5008","508","206","207","307","407","Partner"),
         "Renault" to listOf("Clio","Megane","Twingo","Captur","Scenic","Kadjar","Austral","Kangoo","Trafic"),
         "Citroën" to listOf("C3","C4","C5","Berlingo","Jumpy","Saxo"),
@@ -77,15 +78,18 @@ class MainActivity : Activity() {
             setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, makeOptions))
         }
         val model = AutoCompleteTextView(this).apply {
-            hint = "Modèle (ex. 308, Clio, Golf)"
+            hint = "Rechercher ou saisir le modèle"
             setSingleLine(true)
             setText(selectedModel)
             threshold = 1
         }
         fun refreshModels() {
-            val options = modelSuggestions[make.text.toString().trim()] ?: emptyList()
+            val options = modelSuggestions.entries.firstOrNull {
+                it.key.equals(make.text.toString().trim(), ignoreCase = true)
+            }?.value ?: emptyList()
             model.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, options))
         }
+        model.setOnClickListener { refreshModels(); model.showDropDown() }
         make.setOnItemClickListener { _, _, _, _ ->
             model.setText("")
             refreshModels()
@@ -247,7 +251,7 @@ class MainActivity : Activity() {
     }
     private fun brandGallery() {
         section("CONSTRUCTEURS", "23 logos hors connexion")
-        val cards = brandResources.keys.map { name ->
+        val cards = (brandResources.keys + "Lifan").map { name ->
             column().apply {
                 gravity = Gravity.CENTER; background = surface(); tag = "brand_card"
                 minimumHeight = dp(92); setPadding(dp(6), dp(14), dp(6), dp(14))
