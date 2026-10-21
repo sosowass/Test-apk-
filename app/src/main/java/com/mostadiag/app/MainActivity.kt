@@ -40,10 +40,13 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 12, 30, 8)
         }
-        val make = Spinner(this)
-        make.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Choisir une marque") + makeOptions)
-        val previousIndex = makeOptions.indexOf(selectedMake)
-        if (previousIndex >= 0) make.setSelection(previousIndex + 1)
+        val make = AutoCompleteTextView(this).apply {
+            hint = "Rechercher parmi 143 marques"
+            threshold = 1
+            setSingleLine(true)
+            setText(selectedMake)
+            setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, makeOptions))
+        }
         val model = EditText(this).apply {
             hint = "Modèle (ex. 308, Clio, Golf)"
             setSingleLine(true)
@@ -61,13 +64,14 @@ class MainActivity : Activity() {
         form.addView(model)
         form.addView(text("ANNÉE", 13f, cyan, true))
         form.addView(year)
+        val formScroll = ScrollView(this).apply { addView(form) }
         AlertDialog.Builder(this).setTitle("Sélection du véhicule")
-            .setView(form)
+            .setView(formScroll)
             .setNegativeButton("Annuler", null)
             .setPositiveButton("Enregistrer") { _, _ ->
-                val makeName = make.selectedItem.toString()
+                val makeName = make.text.toString().trim()
                 val modelName = model.text.toString().trim()
-                if (make.selectedItemPosition == 0 || modelName.isBlank()) {
+                if (makeName.isBlank() || modelName.isBlank()) {
                     Toast.makeText(this, "Renseignez la marque et le modèle", Toast.LENGTH_LONG).show()
                 } else {
                     selectedMake = makeName
@@ -163,6 +167,10 @@ class MainActivity : Activity() {
         }
         when (tab) {
             0 -> {
+                section("MON GARAGE")
+                rowAction(if (selectedMake.isBlank()) "▣  Choisir mon véhicule" else "▣  $selectedMake $selectedModel",
+                    if (selectedMake.isBlank()) "143 marques • modèle et année" else "Année $selectedYear • Modifier",
+                    Color.rgb(42, 192, 255)) { chooseVehicle() }
                 section("TABLEAU DE BORD")
                 rowAction("◉  Connexion ELM327", "Bluetooth Classic • appuyer pour choisir le boîtier", Color.rgb(18, 220, 156)) { connect() }
                 section("DIAGNOSTIC RAPIDE")
@@ -290,8 +298,8 @@ class MainActivity : Activity() {
             setPadding(8, 12, 0, 0)
         })
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { setMargins(3, 14, 3, 0) })
-        status = text("●  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(27, 227, 158), true).apply {
-            background = rounded(panel, Color.rgb(27, 227, 158))
+        status = text("○  HORS LIGNE  •  Connecter ELM327", 15f, Color.rgb(255, 178, 91), true).apply {
+            background = rounded(panel, Color.rgb(255, 178, 91))
             setPadding(19, 21, 19, 21)
             setOnClickListener { connect() }
         }
