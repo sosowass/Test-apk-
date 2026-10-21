@@ -146,6 +146,7 @@ class MainActivity : Activity() {
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(panel, Color.rgb(10, 23, 43))).apply { cornerRadius = 28f; setStroke(2, color) }
             setPadding(12, 25, 12, 25)
             elevation = 7f
+            animate().alpha(1f).setDuration(350).start()
             isClickable = true
             isFocusable = true
             setOnClickListener { fn() }
@@ -229,6 +230,13 @@ class MainActivity : Activity() {
             elevation = 5f
             isClickable = true
             setOnClickListener { action() }
+            setOnTouchListener { view, event ->
+                when (event.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> view.animate().scaleX(.97f).scaleY(.97f).setDuration(110).start()
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> view.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+                }
+                false
+            }
         }
         card.addView(text(title + "   ›", 17f, Color.WHITE, true))
         card.addView(text(detail, 12f, Color.rgb(165, 189, 210)).apply { setPadding(0, 6, 0, 0) })
