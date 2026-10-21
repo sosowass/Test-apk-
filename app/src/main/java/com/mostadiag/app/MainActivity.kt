@@ -158,6 +158,45 @@ class MainActivity : Activity() {
             addView(text(subtitle, 11f, Color.rgb(166, 192, 213)).apply { gravity = Gravity.CENTER })
         }
 
+    private fun gauge(title: String, unit: String, accent: Int, value: String): LinearLayout {
+        val frame = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(8, 13, 8, 12)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(17, 42, 76), Color.rgb(5, 14, 32))).apply {
+                cornerRadius = 22f
+                setStroke(2, Color.rgb(29, 88, 143))
+            }
+        }
+        frame.addView(text(title, 12f, Color.rgb(210, 232, 250), true).apply { gravity = Gravity.CENTER })
+        val dial = object : View(this) {
+            private val p = android.graphics.Paint(3)
+            override fun onDraw(c: android.graphics.Canvas) {
+                val cx = width / 2f; val cy = height / 2f
+                val radius = minOf(width, height) * .38f
+                p.style = android.graphics.Paint.Style.STROKE
+                p.strokeWidth = 12f
+                p.strokeCap = android.graphics.Paint.Cap.ROUND
+                p.color = Color.rgb(27, 61, 96)
+                c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 135f, 270f, false, p)
+                p.color = accent
+                p.strokeWidth = 5f
+                c.drawArc(cx-radius, cy-radius, cx+radius, cy+radius, 135f, 270f, false, p)
+                p.style = android.graphics.Paint.Style.FILL
+                p.textAlign = android.graphics.Paint.Align.CENTER
+                p.color = Color.WHITE
+                p.textSize = 34f
+                p.typeface = android.graphics.Typeface.DEFAULT_BOLD
+                c.drawText(value, cx, cy+9f, p)
+                p.textSize = 13f
+                p.color = Color.rgb(165, 199, 222)
+                c.drawText(unit, cx, cy+29f, p)
+            }
+        }
+        frame.addView(dial, LinearLayout.LayoutParams(-1, 145))
+        return frame
+    }
     private fun addGrid(items: List<LinearLayout>) {
         items.chunked(2).forEach { pair ->
             val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -308,6 +347,12 @@ class MainActivity : Activity() {
                 rowAction(if (isConnected) "●  ELM327 CONNECTÉ" else "○  AUCUNE DONNÉE DISPONIBLE",
                     if (isConnected) "Appuyez sur une mesure pour interroger le calculateur" else "Connectez un boîtier OBD2 pour obtenir des valeurs réelles",
                     if (isConnected) Color.rgb(30, 218, 145) else Color.rgb(255, 156, 55)) { if (!isConnected) connect() }
+                section("INSTRUMENTATION NUMÉRIQUE")
+                val dials = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                dials.addView(gauge("RÉGIME MOTEUR", "tr/min", cyan, "—"), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(4, 4, 4, 4) })
+                dials.addView(gauge("VITESSE", "km/h", Color.rgb(52, 230, 172), "—"), LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(4, 4, 4, 4) })
+                content.addView(dials)
+                section("CAPTEURS ET COMMANDES")
                 addGrid(listOf(
                     tile("Régime", "PID 010C", Color.rgb(173, 94, 255), "◉") { execute("010C", "Régime") },
                     tile("Vitesse", "PID 010D", Color.rgb(36, 160, 255), "➤") { execute("010D", "Vitesse") },
