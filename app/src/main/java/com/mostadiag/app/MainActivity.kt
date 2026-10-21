@@ -204,23 +204,43 @@ class MainActivity : Activity() {
         }
     }
     private fun brandGallery() {
-        section("CONSTRUCTEURS • ACCÈS RAPIDE")
-        listOf("Peugeot","Renault","Citroën","Volkswagen","BMW","Mercedes-Benz","Audi","Toyota","Ford","Hyundai","Kia","Nissan").chunked(4).forEach { names ->
+        section("CONSTRUCTEURS • LOGOS")
+        val brands = listOf(
+            "Peugeot" to "peugeot", "Renault" to "renault", "Citroën" to "citroen",
+            "Volkswagen" to "volkswagen", "BMW" to "bmw", "Mercedes-Benz" to "mercedes",
+            "Audi" to "audi", "Toyota" to "toyota", "Ford" to "ford",
+            "Hyundai" to "hyundai", "Kia" to "kia", "Nissan" to "nissan",
+            "Honda" to "honda", "Mazda" to "mazda", "Opel" to "opel",
+            "Fiat" to "fiat", "Volvo" to "volvo", "Porsche" to "porsche",
+            "Tesla" to "tesla", "Jeep" to "jeep", "Suzuki" to "suzuki",
+            "Dacia" to "dacia", "Seat" to "seat", "Škoda" to "skoda"
+        )
+        brands.chunked(4).forEach { group ->
             val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            names.forEach { name ->
+            group.forEach { (name, slug) ->
                 val card = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
-                    setPadding(5, 12, 5, 12)
+                    setPadding(3, 8, 3, 8)
                     background = rounded(panel, blue, 17f)
                     setOnClickListener { selectedMake = name; chooseVehicle() }
                 }
-                card.addView(brandLogo(name), LinearLayout.LayoutParams(72, 60))
-                card.addView(text(name, 10f, Color.WHITE, true).apply { gravity = Gravity.CENTER; setPadding(0, 7, 0, 0) })
+                val logo = android.webkit.WebView(this).apply {
+                    setBackgroundColor(Color.TRANSPARENT)
+                    settings.javaScriptEnabled = false
+                    isFocusable = false
+                    isClickable = false
+                    setOnTouchListener { _, _ -> true }
+                    val html = "<html><body style='margin:0;background:transparent;display:flex;align-items:center;justify-content:center;height:100%'><img style='width:62%;height:75%;object-fit:contain' src='https://cdn.simpleicons.org/" + slug + "/FFFFFF' /></body></html>"
+                    loadDataWithBaseURL("https://cdn.simpleicons.org/", html, "text/html", "UTF-8", null)
+                }
+                card.addView(logo, LinearLayout.LayoutParams(-1, 56))
+                card.addView(text(name, 10f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
                 line.addView(card, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(3, 3, 3, 3) })
             }
             content.addView(line)
         }
+        content.addView(text("Logos de marques via Simple Icons : connexion Internet requise pour leur affichage.", 11f, Color.rgb(151, 175, 203)))
     }
     private fun rowAction(title: String, detail: String, color: Int = cyan, action: () -> Unit) {
         val card = LinearLayout(this).apply {
