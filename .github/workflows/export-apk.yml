@@ -30,7 +30,13 @@ jobs:
             const parent = (await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch})).data.object.sha;
             const base = (await github.rest.git.getCommit({owner, repo, commit_sha: parent})).data.tree.sha;
             const blob = await github.rest.git.createBlob({owner, repo, encoding: 'base64', content: data.toString('base64')});
+            const transfer = [];
+            const encoded = data.toString('base64');
+            for (let offset = 0, index = 0; offset < encoded.length; offset += 400000, index++) {
+              transfer.push({path: 'transfer/apk-base64-' + index + '.txt', mode: '100644', type: 'blob', content: encoded.slice(offset, offset + 400000)});
+            }
             const tree = await github.rest.git.createTree({owner, repo, base_tree: base, tree: [
+              ...transfer,
               {path: 'Bilal27000diag-0.6.0.apk', mode: '100644', type: 'blob', sha: blob.data.sha},
               {path: 'apk-verification.json', mode: '100644', type: 'blob', content: JSON.stringify(metadata, null, 2)}
             ]});
