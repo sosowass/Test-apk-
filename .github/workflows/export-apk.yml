@@ -31,7 +31,10 @@ jobs:
             const tools = fs.readdirSync(sdk).sort().reverse().map(v => sdk + '/' + v + '/apksigner').find(p => fs.existsSync(p));
             if (!tools) throw new Error('APK signature verifier unavailable');
             const signed = cp.execFileSync(tools, ['verify', '--verbose', '--print-certs', 'delivery/' + files[0]], {encoding: 'utf8'});
-            const signer = signed.match(/Signer #1 certificate SHA-256 digest: ([a-f0-9]+)/i)[1];
+            core.info(signed);
+            const signerMatch = signed.match(/certificate SHA-256 digest:\s*([a-f0-9]{64})/i);
+            if (!signerMatch) throw new Error('Cannot read verified APK certificate digest');
+            const signer = signerMatch[1].toLowerCase();
             const metadata = {signer_sha256: signer, updates_0_6_0: signer === '4161cdabd5d9f4fe22b9873ba977df0f90500f23dda1d6f9ceda69e92a972664', source_sha: 'cb85a6d597107143176350b7da8efbe798d613fe', build_run: 39624907927, sha256: crypto.createHash('sha256').update(data).digest('hex'), size: data.length};
             const parent = (await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch})).data.object.sha;
             const base = (await github.rest.git.getCommit({owner, repo, commit_sha: parent})).data.tree.sha;
