@@ -249,7 +249,7 @@ class MainActivity : Activity() {
         section("CONSTRUCTEURS", "23 logos hors connexion")
         val cards = brandResources.keys.map { name ->
             column().apply {
-                gravity = Gravity.CENTER; background = surface()
+                gravity = Gravity.CENTER; background = surface(); tag = "brand_card"
                 minimumHeight = dp(92); setPadding(dp(6), dp(14), dp(6), dp(14))
                 addView(brandLogo(name, 30))
                 addView(text(name, 11f, Color.rgb(213, 227, 240), true).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, 0) })
@@ -261,8 +261,18 @@ class MainActivity : Activity() {
     }
     private fun grid(items: List<View>, columns: Int = if (wide) 4 else 2) {
         items.chunked(columns).forEach { group ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-            group.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(0, -1, 1f).apply { if (i > 0) marginStart = dp(8) }) }
+            val row = object : LinearLayout(this) {
+                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                    val cardHeight = (0 until childCount).maxOfOrNull { getChildAt(it).measuredHeight } ?: 0
+                    for (i in 0 until childCount) {
+                        val child = getChildAt(i)
+                        child.measure(View.MeasureSpec.makeMeasureSpec(child.measuredWidth, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(cardHeight, View.MeasureSpec.EXACTLY))
+                    }
+                }
+            }.apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
+            group.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(0, -2, 1f).apply { if (i > 0) marginStart = dp(8) }) }
             repeat(columns - group.size) { row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(8) }) }
             add(row, 8)
         }
@@ -271,7 +281,7 @@ class MainActivity : Activity() {
         background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.argb(255, Color.red(accent)/7+8, Color.green(accent)/7+10, Color.blue(accent)/7+17), Color.rgb(8, 17, 29))).apply {
             cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent)))
         }
-        setPadding(dp(15), dp(15), dp(14), dp(14)); minimumHeight = dp(112)
+        setPadding(dp(15), dp(15), dp(14), dp(14)); minimumHeight = dp(112); tag = "action_tile"
         val top = LinearLayout(this@MainActivity).apply { gravity = Gravity.CENTER_VERTICAL }
         top.addView(icon(kind, accent, 32, true))
         top.addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))

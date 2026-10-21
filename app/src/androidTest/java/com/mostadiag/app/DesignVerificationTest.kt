@@ -60,6 +60,9 @@ class DesignVerificationTest {
                     }
                     if (index == 3) assertTrue(text.contains("Aucune lecture effectuée"))
                     val screenWidth = activity.resources.displayMetrics.widthPixels
+                    all.filter { it.tag == "action_tile" || it.tag == "brand_card" }.forEach { card ->
+                        assertTrue("Every card must remain visible, including incomplete grid rows", card.height >= (60 * activity.resources.displayMetrics.density).toInt())
+                    }
                     all.filter { it.visibility == View.VISIBLE && it.width > 0 }.forEach { view ->
                         val location = IntArray(2); view.getLocationOnScreen(location)
                         assertTrue("Horizontal overflow: ${view.javaClass.simpleName}", location[0] >= -1 && location[0] + view.width <= screenWidth + 1)
