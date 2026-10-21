@@ -470,7 +470,7 @@ class MainActivity : Activity() {
                 try {
                     socket?.close()
                     val device = target
-                    val s = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                    val s = target.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                     adapter?.cancelDiscovery()
                     s.connect()
                     socket = s; input = s.inputStream; output = s.outputStream
@@ -478,7 +478,7 @@ class MainActivity : Activity() {
                     if (reset.isBlank() || reset.contains("ERROR", ignoreCase = true)) error("Boîtier sans réponse valide")
                     command("ATE0"); command("ATL0"); command("ATS0"); command("ATSP0")
                     isConnected = true
-                    runOnUiThread { status.text = "● Connecté : ${device.name}" }
+                    runOnUiThread { status.text = "● Connecté : ${target.name}" }
                     log("Connexion établie. Protocole automatique activé.")
                 } catch (e: Exception) {
                     isConnected = false
