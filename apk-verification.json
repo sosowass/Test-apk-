@@ -1,8 +1,9 @@
 {
-  "signer_sha256": "ae0c0ea270989e9110c6087f2cb5ef3daf836f41a6b29666595326780b680c5e",
-  "updates_0_6_0": false,
-  "source_sha": "cb85a6d597107143176350b7da8efbe798d613fe",
-  "build_run": 39624907927,
-  "sha256": "bdd89380c718d3dd2f9ab84f67d3af463f4dca0ef74eb1a255e0011e2d7e35bc",
-  "size": 1197122
+  "version": "0.6.2",
+  "source_sha": "d40c90a067a3bf4fdfe7859027f2af1c31ff780c",
+  "build_run": 39631785054,
+  "size": 1758262,
+  "sha256": "fcd32ad843462480ff0667988a2f0241d5aef01782cee7e00a1b4bf7236b7651",
+  "signer_sha256": "80c18768e4669689771660d89aed1e597e4ec0b7fae9ca9ffc0276216b8e9a4b",
+  "updates_0_6_1": false
 }
