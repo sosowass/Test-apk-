@@ -478,6 +478,10 @@ class MainActivity : Activity() {
         else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 10); return }
+        if (adapter?.isEnabled != true) {
+            Toast.makeText(this, "Activez le Bluetooth puis relancez la recherche", Toast.LENGTH_LONG).show()
+            return
+        }
         val devices = linkedMapOf<String, BluetoothDevice>()
         val labels = mutableListOf<String>()
         val listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, labels)
@@ -500,7 +504,7 @@ class MainActivity : Activity() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val device = if (Build.VERSION.SDK_INT >= 33)
                     intent?.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                else @Suppress("DEPRECATION") intent?.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                else intent?.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                 if (device != null && intent?.action == BluetoothDevice.ACTION_FOUND) add(device)
                 if (device != null && intent?.action == BluetoothDevice.ACTION_BOND_STATE_CHANGED &&
                     device.bondState == BluetoothDevice.BOND_BONDED) {
@@ -525,11 +529,14 @@ class MainActivity : Activity() {
             }
         }
         dialog.show()
-        adapter?.startDiscovery()
+        if (adapter?.startDiscovery() != true) {
+            Toast.makeText(this, "Recherche impossible. Vérifiez les autorisations Bluetooth.", Toast.LENGTH_LONG).show()
+        }
     }
     private fun connectDevice(target: BluetoothDevice) {
             thread {
                 try {
+                    runOnUiThread { status.text = "◌ Connexion Bluetooth en cours…" }
                     socket?.close()
                     val device = target
                     val s = target.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
