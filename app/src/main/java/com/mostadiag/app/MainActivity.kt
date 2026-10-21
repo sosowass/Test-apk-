@@ -35,6 +35,21 @@ class MainActivity : Activity() {
     private var selectedModel = ""
     private var selectedYear = 0
     private val makeOptions = listOf("Abarth","Acura","Aiways","Alfa Romeo","Alpine","AMC","Ariel","Aston Martin","Audi","Austin","Avatr","BAIC","Baojun","Bentley","Bestune","BMW","Borgward","Brilliance","Bugatti","Buick","BYD","Cadillac","Changan","Chery","Chevrolet","Chrysler","Citroën","Cupra","Dacia","Daewoo","DAF","Daihatsu","Datsun","Denza","De Tomaso","Dodge","Dongfeng","DS Automobiles","Eagle","Exeed","FAW","Ferrari","Fiat","Fisker","Ford","Forthing","Foton","GAC","Geely","Genesis","GMC","Great Wall","Haval","Holden","Honda","Hongqi","Hummer","Hyundai","IM Motors","Infiniti","Isuzu","Iveco","JAC","Jaecoo","Jaguar","Jeep","Jetour","JMC","Karma","Kia","Koenigsegg","Lada","Lamborghini","Lancia","Land Rover","Leapmotor","Lexus","Li Auto","Lincoln","Lotus","Lucid","Lynk & Co","Mahindra","MAN","Maserati","Maxus","Maybach","Mazda","McLaren","Mercedes-Benz","Mercury","MG","Mini","Mitsubishi","Morgan","Neta","NIO","Nissan","Oldsmobile","Omoda","Opel","Ora","Pagani","Perodua","Peugeot","Plymouth","Polestar","Pontiac","Porsche","Proton","Ram","Renault","Rivian","Roewe","Rolls-Royce","Rover","Saab","Saturn","Scania","Seat","Seres","Skoda","Smart","SsangYong","Subaru","Suzuki","Tata","Tesla","Toyota","UAZ","Vauxhall","VinFast","Volkswagen","Volvo","Voyah","Wey","Wuling","Xiaomi Auto","XPeng","Yangwang","Zeekr","Zotye","Autre marque")
+    private val modelSuggestions = mapOf(
+        "Peugeot" to listOf("208","308","2008","3008","5008","508","206","207","307","407","Partner"),
+        "Renault" to listOf("Clio","Megane","Twingo","Captur","Scenic","Kadjar","Austral","Kangoo","Trafic"),
+        "Citroën" to listOf("C3","C4","C5","Berlingo","Jumpy","Saxo"),
+        "Volkswagen" to listOf("Golf","Polo","Passat","Tiguan","Touareg","Touran"),
+        "BMW" to listOf("Série 1","Série 3","Série 5","X1","X3","X5"),
+        "Audi" to listOf("A1","A3","A4","A6","Q3","Q5","Q7"),
+        "Toyota" to listOf("Yaris","Corolla","RAV4","C-HR","Prius","Hilux"),
+        "Ford" to listOf("Fiesta","Focus","Kuga","Puma","Ranger"),
+        "Hyundai" to listOf("i10","i20","i30","Tucson","Kona"),
+        "Kia" to listOf("Picanto","Ceed","Sportage","Sorento"),
+        "Dacia" to listOf("Sandero","Duster","Logan","Jogger"),
+        "Seat" to listOf("Ibiza","Leon","Ateca"),
+        "Tesla" to listOf("Model 3","Model Y","Model S","Model X")
+    )
     private fun chooseVehicle() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -47,11 +62,22 @@ class MainActivity : Activity() {
             setText(selectedMake)
             setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, makeOptions))
         }
-        val model = EditText(this).apply {
+        val model = AutoCompleteTextView(this).apply {
             hint = "Modèle (ex. 308, Clio, Golf)"
             setSingleLine(true)
             setText(selectedModel)
+            threshold = 1
         }
+        fun refreshModels() {
+            val options = modelSuggestions[make.text.toString().trim()] ?: emptyList()
+            model.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, options))
+        }
+        make.setOnItemClickListener { _, _, _, _ ->
+            model.setText("")
+            refreshModels()
+            model.showDropDown()
+        }
+        refreshModels()
         val year = NumberPicker(this).apply {
             minValue = 1950
             maxValue = 2027
