@@ -271,7 +271,7 @@ class MainActivity : Activity() {
         background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.argb(255, Color.red(accent)/7+8, Color.green(accent)/7+10, Color.blue(accent)/7+17), Color.rgb(8, 17, 29))).apply {
             cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent)))
         }
-        setPadding(dp(15), dp(15), dp(14), dp(14)); minimumHeight = dp(126)
+        setPadding(dp(15), dp(15), dp(14), dp(14)); minimumHeight = dp(112)
         val top = LinearLayout(this@MainActivity).apply { gravity = Gravity.CENTER_VERTICAL }
         top.addView(icon(kind, accent, 32, true))
         top.addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 1, 1f))
@@ -312,7 +312,7 @@ class MainActivity : Activity() {
         frame.addView(text("MULTIMARQUE   /   OBD-II   /   BLUETOOTH", 9f, Color.rgb(190, 223, 240), true).apply {
             letterSpacing = .08f; setPadding(dp(18), 0, dp(12), dp(14))
         }, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-        content.addView(frame, LinearLayout.LayoutParams(-1, dp(if (wide) 320 else if (largeText) 270 else 232)).apply { bottomMargin = dp(12) })
+        content.addView(frame, LinearLayout.LayoutParams(-1, dp(if (wide) 320 else if (largeText) 250 else 196)).apply { bottomMargin = dp(12) })
     }
     private fun reading(vararg labels: String): String? = if (isConnected) labels.firstNotNullOfOrNull { latestReadings[it] } else null
     private fun gauge(title: String, unit: String, accent: Int, value: String?, max: Float, action: () -> Unit): View = column().apply {
@@ -457,7 +457,7 @@ class MainActivity : Activity() {
         selectedMake = prefs.getString("make", "") ?: ""; selectedModel = prefs.getString("model", "") ?: ""; selectedYear = prefs.getInt("year", 0)
         val root = column().apply { setBackgroundColor(bg) }
         val header = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(14), dp(12), dp(12)); minimumHeight = dp(64)
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(10), dp(12), dp(8)); minimumHeight = dp(64)
         }
         header.addView(ImageView(this).apply { setImageResource(R.drawable.bilal_engine); contentDescription = "Bilal27000diag" }, LinearLayout.LayoutParams(dp(34), dp(34)))
         header.addView(column().apply {

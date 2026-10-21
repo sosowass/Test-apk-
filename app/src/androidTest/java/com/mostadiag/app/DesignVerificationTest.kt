@@ -22,6 +22,10 @@ class DesignVerificationTest {
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
     private fun capture(name: String) {
         instrumentation.waitForIdleSync()
+        // Idle on the UI thread does not mean the emulator compositor has presented
+        // the new frame. Let rendering finish before reading the display surface.
+        android.os.SystemClock.sleep(600)
+        instrumentation.waitForIdleSync()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull("Android screenshot available", bitmap)
         val folder = File(instrumentation.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
