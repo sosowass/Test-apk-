@@ -1,7 +1,23 @@
 {
-  "source_sha": "e08e9909b29bcf8514b4f872a630b26d8b270bf0",
-  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39613556973",
+  "source_sha": "c82e3d738376402d52a257d082899257b0e8a7f6",
+  "run_url": "https://github.com/sosowass/Test-apk-/actions/runs/39613792028",
   "screenshots": [
+    "compact_1_accueil.webp",
+    "compact_1_accueil_bas.webp",
+    "compact_2_vehicule.webp",
+    "compact_2_vehicule_bas.webp",
+    "compact_3_mesures.webp",
+    "compact_3_mesures_bas.webp",
+    "compact_4_rapport.webp",
+    "compact_5_parametres.webp",
+    "large_text_1_accueil.webp",
+    "large_text_1_accueil_bas.webp",
+    "large_text_2_vehicule.webp",
+    "large_text_2_vehicule_bas.webp",
+    "large_text_3_mesures.webp",
+    "large_text_3_mesures_bas.webp",
+    "large_text_4_rapport.webp",
+    "large_text_5_parametres.webp",
     "phone_1_accueil.webp",
     "phone_1_accueil_bas.webp",
     "phone_2_vehicule.webp",
@@ -9,6 +25,14 @@
     "phone_3_mesures.webp",
     "phone_3_mesures_bas.webp",
     "phone_4_rapport.webp",
-    "phone_5_parametres.webp"
+    "phone_5_parametres.webp",
+    "tablet_1_accueil.webp",
+    "tablet_1_accueil_bas.webp",
+    "tablet_2_vehicule.webp",
+    "tablet_2_vehicule_bas.webp",
+    "tablet_3_mesures.webp",
+    "tablet_3_mesures_bas.webp",
+    "tablet_4_rapport.webp",
+    "tablet_5_parametres.webp"
   ]
 }
