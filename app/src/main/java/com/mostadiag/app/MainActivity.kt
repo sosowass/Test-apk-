@@ -30,6 +30,58 @@ class MainActivity : Activity() {
     @Volatile private var isConnected = false
     private val latestReadings = linkedMapOf<String, String>()
     private val history = StringBuilder()
+
+    private var selectedMake = ""
+    private var selectedModel = ""
+    private var selectedYear = 0
+    private val makeOptions = listOf("Abarth","Alfa Romeo","Audi","BMW","BYD","Chevrolet","Citroën","Dacia","Fiat","Ford","Honda","Hyundai","Jaguar","Jeep","Kia","Land Rover","Lexus","Mazda","Mercedes-Benz","MG","Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche","Renault","Seat","Skoda","Subaru","Suzuki","Tesla","Toyota","Volkswagen","Volvo","Autre marque")
+    private fun chooseVehicle() {
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 12, 30, 8)
+        }
+        val make = Spinner(this)
+        make.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Choisir une marque") + makeOptions)
+        val previousIndex = makeOptions.indexOf(selectedMake)
+        if (previousIndex >= 0) make.setSelection(previousIndex + 1)
+        val model = EditText(this).apply {
+            hint = "Modèle (ex. 308, Clio, Golf)"
+            setSingleLine(true)
+            setText(selectedModel)
+        }
+        val year = NumberPicker(this).apply {
+            minValue = 1950
+            maxValue = 2027
+            value = if (selectedYear in 1950..2027) selectedYear else 2026
+            wrapSelectorWheel = false
+        }
+        form.addView(text("MARQUE", 13f, cyan, true))
+        form.addView(make)
+        form.addView(text("MODÈLE", 13f, cyan, true))
+        form.addView(model)
+        form.addView(text("ANNÉE", 13f, cyan, true))
+        form.addView(year)
+        AlertDialog.Builder(this).setTitle("Sélection du véhicule")
+            .setView(form)
+            .setNegativeButton("Annuler", null)
+            .setPositiveButton("Enregistrer") { _, _ ->
+                val makeName = make.selectedItem.toString()
+                val modelName = model.text.toString().trim()
+                if (make.selectedItemPosition == 0 || modelName.isBlank()) {
+                    Toast.makeText(this, "Renseignez la marque et le modèle", Toast.LENGTH_LONG).show()
+                } else {
+                    selectedMake = makeName
+                    selectedModel = modelName
+                    selectedYear = year.value
+                    getSharedPreferences("vehicle", MODE_PRIVATE).edit()
+                        .putString("make", selectedMake)
+                        .putString("model", selectedModel)
+                        .putInt("year", selectedYear).apply()
+                    showTab(1)
+                }
+            }.show()
+    }
+
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var nav: LinearLayout
@@ -126,6 +178,10 @@ class MainActivity : Activity() {
                 rowAction("Voir le journal", "Résultats et réponses du véhicule") { showTab(3) }
             }
             1 -> {
+                section("MON VÉHICULE")
+                rowAction("Marque • modèle • année",
+                    if (selectedMake.isBlank()) "Sélectionner mon véhicule" else "$selectedMake $selectedModel • $selectedYear",
+                    Color.rgb(29, 218, 147)) { chooseVehicle() }
                 section("IDENTIFICATION MULTIMARQUE")
                 rowAction("Lire le VIN", "Mode OBD 09 PID 02 • selon compatibilité") { execute("0902", "VIN (réponse brute)") }
                 rowAction("Protocole du véhicule", "Interroger l'interface ELM327") { execute("ATDP", "Protocole actif") }
@@ -188,6 +244,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val vehiclePrefs = getSharedPreferences("vehicle", MODE_PRIVATE)
+        selectedMake = vehiclePrefs.getString("make", "") ?: ""
+        selectedModel = vehiclePrefs.getString("model", "") ?: ""
+        selectedYear = vehiclePrefs.getInt("year", 0)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
