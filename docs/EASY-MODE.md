@@ -18,8 +18,10 @@ Arrêter la lecture empêche de lancer la suivante et conserve les points reçus
 C’est fait enregistre le contrôle manuel. Plus tard passe à la suite sans le
 valider. Étape d’avant permet de revenir ; Remettre à faire décoche un point.
 La rotation conserve l’étape affichée. À la réouverture, Reprendre retourne au
-premier point incomplet. Le résultat indique ce qui est fait/restant, sans
-conclure à l’absence de panne. Le suivi par profil et le partage sont conservés.
+premier point incomplet. Le résultat résume les sept étapes avec un raccourci pour
+revoir chacune d’elles. Les quinze points restent conservés dans le rapport
+détaillé. Une lecture automatique partielle laisse l’étape à faire. Aucun écran
+ne conclut à l’absence de panne. Le suivi par profil et le partage sont conservés.
 
 Écouter lit une consigne en français avec la synthèse vocale Android. Une voix
 française doit être disponible sur le téléphone ; sinon un message le signale et

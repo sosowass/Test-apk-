@@ -116,7 +116,7 @@ class MainActivity : Activity() {
         easyAction("Ma voiture", scope?.vehicle ?: "Choisir la voiture", "car", "easy_vehicle") { chooseVehicle() }
         easyAction(if (isConnected) "Boîtier connecté" else "Brancher le boîtier",
             if (isConnected) "Le téléphone peut lire la voiture." else "Le petit appareil qui relie la voiture au téléphone.", "bluetooth", "easy_connect") { connect() }
-        easyAction("Ce qui est fait", scope?.let { "${checklist.entries(it).values.count { entry -> entry.checked }} contrôles enregistrés" }
+        easyAction("Ce qui est fait", scope?.let { "${EasyDiagnostic.completedCount(checklist.entries(it))} étapes terminées sur 7" }
             ?: "Tes contrôles seront gardés ici.", "report", "easy_results") { showTab(5) }
         add(easyButton("Écouter l’aide", "easy_listen_home") {
             speakInstruction("Choisis la voiture. Branche le petit boîtier sous le volant. Puis touche Commencer. Je te guide, une chose à la fois.")
@@ -141,8 +141,7 @@ class MainActivity : Activity() {
             return
         }
         val step = EasyDiagnostic.steps[easyStep]
-        val complete = if (step.id == null) DiagnosticChecklist.ITEMS.filter { it.command != null }.all { entries[it.id]?.checked == true }
-            else entries[step.id]?.checked == true
+        val complete = EasyDiagnostic.isComplete(step, entries)
         add(text("Étape ${easyStep + 1} sur ${EasyDiagnostic.steps.size}", 18f, cyan, true).apply { tag = "easy_step"; setPadding(0, dp(12), 0, 0) })
         add(icon(step.picture, if (complete) green else cyan, if (wide) 100 else 64).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, 4)
         easyHeading(step.title, step.instruction)
@@ -204,21 +203,19 @@ class MainActivity : Activity() {
             return
         }
         val entries = checklist.entries(scope)
-        val done = entries.values.count { it.checked }
+        val done = EasyDiagnostic.completedCount(entries)
         easyHeading("Ce qui est fait", scope.vehicle)
-        add(text("$done sur 15 contrôles faits", 24f, green, true).apply { tag = "easy_result_count" })
-        add(text("${15 - done} encore à faire", 18f, amber))
+        add(text("$done sur 7 étapes terminées", 24f, green, true).apply { tag = "easy_result_count" })
+        add(text("${7 - done} encore à faire", 18f, amber))
         add(easyButton("Reprendre les contrôles", "easy_resume", green) { easyStep = -1; showTab(3) })
         add(easyButton("Partager le résultat", "easy_share") { shareReport() })
         add(text("Fait veut dire vérifié. Cela ne veut pas dire que la voiture n’a aucun problème.", 17f, muted))
-        DiagnosticChecklist.ITEMS.forEach { item ->
-            val checked = entries[item.id]?.checked == true
-            val title = EasyDiagnostic.steps.firstOrNull { it.id == item.id }?.title ?: when (item.id) {
-                "vin" -> "Numéro de la voiture"; "protocol" -> "Liaison avec la voiture"; "dtc" -> "Messages de panne"
-                "rpm" -> "Rythme du moteur"; "temperature" -> "Chaleur du moteur"; "voltage" -> "Électricité du moteur"
-                "load" -> "Effort du moteur"; "intake" -> "Air dans le moteur"; else -> "Arrivée d’air"
+        EasyDiagnostic.steps.forEachIndexed { index, step ->
+            val checked = EasyDiagnostic.isComplete(step, entries)
+            easyAction("${if (checked) "✓ Fait" else "À faire"} · ${step.title}",
+                if (checked) "Tu peux revoir ce contrôle." else "Toucher pour reprendre ici.", step.picture, "easy_review_$index") {
+                easyStep = index; easyScopeId = "${scope.key}:${scope.session}"; showTab(3)
             }
-            add(text("${if (checked) "✓ Fait" else "À faire"} · $title", 18f, if (checked) green else muted).apply { setPadding(dp(4), dp(10), dp(4), dp(10)) })
         }
         add(easyButton("Tout recommencer", "easy_reset", amber) {
             AlertDialog.Builder(this).setTitle("Tout recommencer pour cette voiture ?")

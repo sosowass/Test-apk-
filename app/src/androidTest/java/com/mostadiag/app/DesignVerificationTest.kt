@@ -113,7 +113,7 @@ class DesignVerificationTest {
                 scenario.onActivity { activity ->
                     val root = activity.window.decorView
                     root.findViewWithTag<View>("tab_5").performClick()
-                    assertEquals("Skipped OBD and coolant stay unchecked", "1 sur 15 contrôles faits", root.findViewWithTag<TextView>("easy_result_count").text.toString())
+                    assertEquals("Skipped OBD and coolant stay unchecked", "1 sur 7 étapes terminées", root.findViewWithTag<TextView>("easy_result_count").text.toString())
                 }
                 capture("${format}_easy_resultat")
                 scenario.onActivity { activity ->
@@ -128,7 +128,7 @@ class DesignVerificationTest {
                     root.findViewWithTag<View>("enable_easy").performClick()
                     assertNotNull(root.findViewWithTag<View>("tab_5"))
                     root.findViewWithTag<View>("tab_5").performClick()
-                    assertTrue("Mode switching retains progress", root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 15"))
+                    assertTrue("Mode switching retains progress", root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 7"))
                 }
             }
             ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
@@ -136,7 +136,7 @@ class DesignVerificationTest {
                     val root = activity.window.decorView
                     assertNotNull("Simple mode remains selected after relaunch", root.findViewWithTag<View>("tab_5"))
                     root.findViewWithTag<View>("tab_5").performClick()
-                    assertTrue(root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 15"))
+                    assertTrue(root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 7"))
                 }
             }
         } finally { profile.edit().clear().commit(); tracking.edit().clear().commit(); appearance.edit().putBoolean("easy", false).commit() }

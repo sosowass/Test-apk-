@@ -4,7 +4,7 @@ package com.mostadiag.app
 object EasyDiagnostic {
     data class Step(val id: String?, val title: String, val instruction: String, val picture: String)
     val steps = listOf(
-        Step(null, "Lire la voiture", "Branche le petit boîtier sous le volant. Garde la voiture à l’arrêt. Le téléphone va lire les informations de la voiture.", "car"),
+        Step(null, "Lire la voiture", "Garde la voiture à l’arrêt. Branche le boîtier sous le volant et mets le contact. Le téléphone lit les informations de la voiture.", "car"),
         Step("oil", "L’huile du moteur", "Regarde si le niveau d’huile est entre les deux repères. Suis les indications du carnet de la voiture.", "oil"),
         Step("coolant", "Le liquide du moteur", "Attends que le moteur soit froid. Regarde si le liquide est entre MIN et MAX. N’ouvre pas le bouchon quand le moteur est chaud.", "temperature"),
         Step("tyres", "Les pneus", "Regarde les quatre pneus. Vérifie leur pression et cherche une coupure ou un pneu très usé.", "tyre"),
@@ -16,4 +16,8 @@ object EasyDiagnostic {
         if (DiagnosticChecklist.ITEMS.any { it.command != null && entries[it.id]?.checked != true }) return 0
         return steps.indexOfFirst { it.id != null && entries[it.id]?.checked != true }.let { if (it < 0) steps.size else it }
     }
+    fun isComplete(step: Step, entries: Map<String, DiagnosticChecklist.Entry>): Boolean =
+        if (step.id == null) DiagnosticChecklist.ITEMS.filter { it.command != null }.all { entries[it.id]?.checked == true }
+        else entries[step.id]?.checked == true
+    fun completedCount(entries: Map<String, DiagnosticChecklist.Entry>): Int = steps.count { isComplete(it, entries) }
 }
