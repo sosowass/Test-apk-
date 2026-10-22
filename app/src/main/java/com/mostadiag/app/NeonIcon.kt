@@ -22,6 +22,11 @@ class NeonIcon(context: Context, private val kind: String, var tint: Int, privat
         }
         fun line(x: Float, y: Float, a: Float, b: Float) = canvas.drawLine(x, y, a, b, p)
         when (kind) {
+            "oil" -> { path(3f, 10f, 15f, 10f, 18f, 15f, 16f, 20f, 5f, 20f, 3f, 10f); path(6f, 10f, 6f, 5f, 12f, 5f, 12f, 10f); path(15f, 11f, 20f, 7f, 22f, 9f, 18f, 15f) }
+            "tyre" -> { canvas.drawOval(5f, 2f, 19f, 22f, p); canvas.drawOval(9f, 6f, 15f, 18f, p); line(6f, 7f, 9f, 9f); line(6f, 16f, 9f, 15f); line(15f, 9f, 18f, 7f); line(15f, 15f, 18f, 16f) }
+            "brakes" -> { canvas.drawCircle(12f, 12f, 8f, p); canvas.drawCircle(12f, 12f, 3f, p); path(18f, 5f, 22f, 5f, 22f, 13f, 19f, 15f) }
+            "lights" -> { path(14f, 4f, 8f, 7f, 8f, 17f, 14f, 20f, 14f, 4f); line(17f, 7f, 22f, 5f); line(17f, 12f, 23f, 12f); line(17f, 17f, 22f, 19f) }
+            "leak" -> { val drop = Path().apply { moveTo(12f, 2f); cubicTo(10f, 7f, 5f, 11f, 5f, 15f); cubicTo(5f, 24f, 19f, 24f, 19f, 15f); cubicTo(19f, 11f, 14f, 7f, 12f, 2f) }; canvas.drawPath(drop, p) }
             "home" -> { path(3f, 11f, 12f, 3f, 21f, 11f); path(5f, 10f, 5f, 21f, 10f, 21f, 10f, 15f, 14f, 15f, 14f, 21f, 19f, 21f, 19f, 10f) }
             "car" -> { path(3f, 12f, 6f, 5f, 18f, 5f, 21f, 12f, 21f, 19f, 3f, 19f, 3f, 12f, 21f, 12f); line(6f, 15f, 8f, 15f); line(16f, 15f, 18f, 15f); line(6f, 19f, 6f, 21f); line(18f, 19f, 18f, 21f) }
             "bars" -> { line(5f, 20f, 5f, 13f); line(12f, 20f, 12f, 4f); line(19f, 20f, 19f, 9f); p.strokeWidth = 3f; line(5f, 20f, 5f, 13f); line(12f, 20f, 12f, 4f); line(19f, 20f, 19f, 9f); p.strokeWidth = 1.65f }
@@ -40,3 +45,4 @@ class NeonIcon(context: Context, private val kind: String, var tint: Int, privat
         p.clearShadowLayer(); canvas.restore()
     }
 }
+
