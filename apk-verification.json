@@ -1,0 +1,9 @@
+{
+  "version": "0.6.3",
+  "source_sha": "b308d22fb23dcc03d0e2052c6860e85c75783d6e",
+  "build_run": 39868087397,
+  "size": 1774374,
+  "sha256": "b0210ef75680a50bea57eba5728cb2736ce5053fd503eec49d5ca3f4b113da59",
+  "signer_sha256": "f69bcbf3ae60aa9bce043db7156d9f6c31eb5ad9d9b66b9595d60267ba45af79",
+  "updates_0_6_1": false
+}
