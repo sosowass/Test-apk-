@@ -102,6 +102,16 @@ class DesignVerificationTest {
                     assertFalse("An offline attempt must leave the item unchecked", root.findViewWithTag<CheckBox>("check_rpm").isChecked)
                     root.findViewWithTag<CheckBox>("check_oil").performClick()
                     assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("1/15"))
+                }
+                val format = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
+                capture("${format}_checklist_complete")
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    val screenWidth = activity.resources.displayMetrics.widthPixels
+                    descendants(root).filter { it.visibility == View.VISIBLE && it.width > 0 }.forEach { view ->
+                        val location = IntArray(2); view.getLocationOnScreen(location)
+                        assertTrue("Checklist horizontal overflow: ${view.javaClass.simpleName}", location[0] >= -1 && location[0] + view.width <= screenWidth + 1)
+                    }
                     root.findViewWithTag<View>("checklist_filter_1").performClick()
                     assertNull(root.findViewWithTag<View>("check_oil"))
                     root.findViewWithTag<View>("checklist_filter_2").performClick()
@@ -114,7 +124,6 @@ class DesignVerificationTest {
                     assertTrue(root.findViewWithTag<View>("checklist_filter_2").isSelected)
                     assertTrue(root.findViewWithTag<CheckBox>("check_oil").isChecked)
                 }
-                val format = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
                 capture("${format}_checklist_verifiee")
             }
             launch().use { scenario ->

@@ -845,7 +845,9 @@ class MainActivity : Activity() {
                 val valid = DiagnosticChecklist.validReply(cmd, raw)
                 runOnUiThread {
                     if (scope != null && item != null && valid) checklist.set(scope, item.id, true, reading)
-                    if (cmd.startsWith("01") && valid && reading != raw.trim() && scope?.key == checklistScope()?.key) {
+                    val currentScope = checklistScope()
+                    if (cmd.startsWith("01") && valid && reading != raw.trim() &&
+                        scope?.key == currentScope?.key && scope?.session == currentScope?.session) {
                         val measurement = when (cmd) {
                             "010C" -> "Régime"; "0105" -> "Température"; "0142" -> "Tension module"
                             "0104" -> "Charge moteur"; "010B" -> "Pression admission"; "0111" -> "Papillon"
@@ -853,7 +855,7 @@ class MainActivity : Activity() {
                         }
                         latestReadings[measurement] = reading.substringBefore("\n")
                     }
-                    if (!isDestroyed && selectedTab == 2) showTab(2)
+                    if (!isDestroyed && selectedTab in listOf(0, 2)) showTab(selectedTab)
                 }
                 log("${scope?.vehicle ?: "Sans profil véhicule"}\n$label\n$reading")
             }
