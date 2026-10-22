@@ -8,6 +8,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.AutoCompleteTextView
 import android.widget.ListView
+import android.widget.CheckBox
 import android.view.inspector.WindowInspector
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -36,6 +37,117 @@ class DesignVerificationTest {
         val folder = File(instrumentation.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(folder, "$name.webp").outputStream().use { bitmap.compress(Bitmap.CompressFormat.WEBP, 90, it) }
         bitmap.recycle()
+    }
+    @Test fun checklistPersistsAndKeepsVehiclesAndNewDiagnosticsSeparate() {
+        val context = instrumentation.targetContext
+        val preferences = context.getSharedPreferences("checklist_store_test", 0)
+        preferences.edit().clear().commit()
+        try {
+            val store = DiagnosticChecklist(preferences)
+            val first = requireNotNull(store.scope("Peugeot", "308", 2020))
+            val second = requireNotNull(store.scope("Peugeot", "308", 2021))
+            assertNull(store.scope("", "", 0))
+            assertTrue(store.set(first, "oil", true, "Contrôle manuel"))
+            val reopened = DiagnosticChecklist(context.getSharedPreferences("checklist_store_test", 0))
+            val same = requireNotNull(reopened.scope(" PEUGEOT ", "308", 2020))
+            assertEquals(first.key, same.key)
+            assertTrue(reopened.entries(same).getValue("oil").checked)
+            assertTrue(reopened.entries(same).getValue("oil").timestamp > 0)
+            assertFalse(reopened.entries(second).values.any { it.checked })
+            assertTrue(store.set(second, "tyres", true))
+            store.reset(first)
+            assertFalse("An old reply cannot complete a new diagnostic", store.set(first, "rpm", true, "800 tr/min"))
+            val fresh = requireNotNull(store.scope("Peugeot", "308", 2020))
+            assertNotEquals(first.session, fresh.session)
+            assertFalse(store.entries(fresh).values.any { it.checked })
+            assertTrue(store.entries(second).getValue("tyres").checked)
+        } finally { preferences.edit().clear().commit() }
+    }
+
+    @Test fun checklistOnlyAcceptsUsableObdReplies() {
+        for (reply in listOf("", "NO DATA", "UNABLE TO CONNECT", "CAN ERROR", "STOPPED", "?", "OK", "410C1A", "410D00")) {
+            assertFalse("Unavailable, partial or wrong PID: $reply", DiagnosticChecklist.validReply("010C", reply))
+        }
+        assertTrue(DiagnosticChecklist.validReply("010C", "010C\r41 0C 1A F8"))
+        assertTrue(DiagnosticChecklist.validReply("0105", "SEARCHING...\r41 05 5A"))
+        assertFalse(DiagnosticChecklist.validReply("0142", "41422F"))
+        assertTrue(DiagnosticChecklist.validReply("0142", "41 42 2F 10"))
+        assertTrue("A read with DTCs is completed, without declaring the vehicle healthy", DiagnosticChecklist.validReply("03", "43 01 33"))
+        assertTrue(DiagnosticChecklist.validReply("03", "43 00 00"))
+        assertFalse(DiagnosticChecklist.validReply("03", "OK"))
+        assertFalse(DiagnosticChecklist.validReply("ATDP", "AUTO"))
+        assertTrue(DiagnosticChecklist.validReply("ATDP", "AUTO, ISO 15765-4 (CAN 11/500)"))
+        val vin = "VF3AAAAAAAA123456"
+        val encoded = vin.toByteArray().joinToString(" ") { "%02X".format(it) }
+        assertTrue(DiagnosticChecklist.validReply("0902", "49 02 01 $encoded"))
+        assertFalse(DiagnosticChecklist.validReply("0902", "49 02 01 56 46 33"))
+    }
+
+    @android.annotation.TargetApi(29)
+    @Test fun checklistCheckboxesFiltersAndResetWorkAcrossRecreation() {
+        val context = instrumentation.targetContext
+        val profile = context.getSharedPreferences("vehicle", 0)
+        val tracking = context.getSharedPreferences("diagnostic_checklist", 0)
+        tracking.edit().clear().commit()
+        profile.edit().putString("make", "Peugeot").putString("model", "308").putInt("year", 2020).commit()
+        fun launch() = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java))
+        try {
+            launch().use { scenario ->
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    root.findViewWithTag<View>("tab_3").performClick()
+                    assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
+                    val read = root.findViewWithTag<View>("read_rpm")
+                    read.performClick()
+                    assertFalse("An offline attempt must leave the item unchecked", root.findViewWithTag<CheckBox>("check_rpm").isChecked)
+                    root.findViewWithTag<CheckBox>("check_oil").performClick()
+                    assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("1/15"))
+                    root.findViewWithTag<View>("checklist_filter_1").performClick()
+                    assertNull(root.findViewWithTag<View>("check_oil"))
+                    root.findViewWithTag<View>("checklist_filter_2").performClick()
+                    assertTrue(root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                    assertNull(root.findViewWithTag<View>("check_tyres"))
+                }
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    assertTrue(root.findViewWithTag<View>("checklist_filter_2").isSelected)
+                    assertTrue(root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                }
+                val format = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
+                capture("${format}_checklist_verifiee")
+            }
+            launch().use { scenario ->
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    root.findViewWithTag<View>("tab_3").performClick()
+                    assertTrue("Saved after closing the activity", root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                    profile.edit().putInt("year", 2021).commit()
+                }
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    assertTrue(activity.window.decorView.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
+                    profile.edit().putInt("year", 2020).commit()
+                }
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    assertTrue(root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                    root.findViewWithTag<CheckBox>("check_oil").performClick()
+                    assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
+                    root.findViewWithTag<CheckBox>("check_oil").performClick()
+                    val resetTitle = descendants(root).filterIsInstance<TextView>().first { it.text == "Nouveau diagnostic" }
+                    (resetTitle.parent.parent as View).performClick()
+                    val dialog = WindowInspector.getGlobalWindowViews().first { it.findViewById<View>(android.R.id.button1) != null }
+                    dialog.findViewById<View>(android.R.id.button2).performClick()
+                    assertTrue("Cancel keeps progress", root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                    (resetTitle.parent.parent as View).performClick()
+                    WindowInspector.getGlobalWindowViews().first { it.findViewById<View>(android.R.id.button1) != null }
+                        .findViewById<View>(android.R.id.button1).performClick()
+                    assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
+                }
+            }
+        } finally { profile.edit().clear().commit(); tracking.edit().clear().commit() }
     }
     @Test fun fiveScreensRemainUsableWithoutVehicleData() {
         val context = instrumentation.targetContext
@@ -234,3 +346,4 @@ class DesignVerificationTest {
         context.getSharedPreferences("vehicle", 0).edit().clear().commit()
     }
 }
+

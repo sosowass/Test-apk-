@@ -44,6 +44,124 @@ class MainActivity : Activity() {
     @Volatile private var isConnected = false
     private val latestReadings = linkedMapOf<String, String>()
     private val history = StringBuilder()
+    private val checklist by lazy { DiagnosticChecklist(getSharedPreferences("diagnostic_checklist", MODE_PRIVATE)) }
+    private var checklistFilter = 0
+    private val pendingChecks = mutableSetOf<String>()
+
+    // Use the saved profile: browsing a brand must not move the diagnostic to another vehicle.
+    private fun checklistScope(): DiagnosticChecklist.Scope? {
+        val profile = getSharedPreferences("vehicle", MODE_PRIVATE)
+        return checklist.scope(profile.getString("make", "") ?: "", profile.getString("model", "") ?: "", profile.getInt("year", 0))
+    }
+
+    private fun checklistDate(timestamp: Long): String = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.FRANCE)
+        .format(java.util.Date(timestamp))
+
+    private fun checklistSummary(): String {
+        val scope = checklistScope() ?: return "Choisir un véhicule pour commencer"
+        val done = checklist.entries(scope).values.count { it.checked }
+        return "$done/${DiagnosticChecklist.ITEMS.size} vérifiés · ${DiagnosticChecklist.ITEMS.size - done} à vérifier"
+    }
+
+    private fun checklistReport(): String {
+        val scope = checklistScope() ?: return "CHECKLIST : aucun véhicule sélectionné."
+        val entries = checklist.entries(scope)
+        return buildString {
+            append("BILAL27000DIAG — DIAGNOSTIC\n").append(scope.vehicle).append("\n")
+            append(checklistSummary()).append("\n\n")
+            DiagnosticChecklist.ITEMS.forEach { item ->
+                val entry = entries[item.id] ?: DiagnosticChecklist.Entry()
+                append(if (entry.checked) "[x] Vérifié : " else "[ ] À vérifier : ").append(item.title)
+                if (entry.checked) {
+                    append(" — ").append(checklistDate(entry.timestamp))
+                    if (entry.detail.isNotBlank()) append("\n    ").append(entry.detail)
+                }
+                append("\n")
+            }
+            append("\nUne case cochée indique un contrôle réalisé, sans conclure à l’absence de défaut.\n")
+        }
+    }
+
+    private fun showChecklist() {
+        val scope = checklistScope()
+        if (scope == null) {
+            note("Sélectionnez votre véhicule", "Enregistrez sa marque, son modèle et son année pour retrouver ses contrôles à la prochaine ouverture.", cyan, "car")
+            vehicleCard()
+            return
+        }
+        val entries = checklist.entries(scope)
+        val total = DiagnosticChecklist.ITEMS.size
+        val done = entries.values.count { it.checked }
+        add(column().apply {
+            background = surface(cyan); setPadding(dp(16), dp(18), dp(16), dp(18))
+            addView(text(scope.vehicle, 14f, muted, true))
+            addView(text("$done/$total contrôles vérifiés · ${done * 100 / total} %", 21f, Color.WHITE, true).apply {
+                tag = "checklist_progress"; setPadding(0, dp(10), 0, dp(10)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            })
+            addView(ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = total; progress = done; progressTintList = ColorStateList.valueOf(green)
+                progressBackgroundTintList = ColorStateList.valueOf(Color.rgb(34, 54, 74))
+                contentDescription = "$done contrôles vérifiés sur $total"
+            }, LinearLayout.LayoutParams(-1, dp(8)))
+            addView(text("${total - done} à vérifier · progression sauvegardée sur ce téléphone", 12f, muted).apply { setPadding(0, dp(10), 0, 0) })
+            addView(text("Pour un autre véhicule de même marque, modèle et année, lancez un nouveau diagnostic.", 11f, muted).apply { setPadding(0, dp(8), 0, 0) })
+        })
+        val filters = LinearLayout(this).apply { orientation = if (largeText) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL }
+        listOf("Tous", "À vérifier", "Vérifiés").forEachIndexed { index, label ->
+            filters.addView(text(label, 12f, if (checklistFilter == index) cyan else muted, true).apply {
+                tag = "checklist_filter_$index"; gravity = Gravity.CENTER; minHeight = dp(48)
+                isSelected = checklistFilter == index; background = rounded(panel, if (isSelected) cyan else panel, 12f)
+                actionable(this) { checklistFilter = index; showTab(3) }
+            }, if (largeText) LinearLayout.LayoutParams(-1, -2) else LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        add(filters)
+        val visible = DiagnosticChecklist.ITEMS.filter { item ->
+            val checked = entries[item.id]?.checked == true
+            checklistFilter == 0 || (checklistFilter == 1 && !checked) || (checklistFilter == 2 && checked)
+        }
+        if (visible.isEmpty()) note("Aucun contrôle dans ce filtre", if (done == total) "Tous les points ont été vérifiés. Le rapport reste disponible ci-dessous." else "Les points vérifiés apparaîtront ici.", green)
+        visible.groupBy { it.group }.forEach { (group, items) ->
+            section(group)
+            items.forEach { item ->
+                val entry = entries[item.id] ?: DiagnosticChecklist.Entry()
+                val pending = "${scope.key}:${scope.session}:${item.command}" in pendingChecks
+                val card = column().apply { background = surface(if (entry.checked) green else Color.rgb(34, 54, 74)); setPadding(dp(12), dp(10), dp(12), dp(12)) }
+                card.addView(CheckBox(this).apply {
+                    tag = "check_${item.id}"; text = item.title; textSize = 15f; setTextColor(Color.WHITE)
+                    buttonTintList = ColorStateList.valueOf(if (entry.checked) green else muted)
+                    minHeight = dp(48); isChecked = entry.checked
+                    isEnabled = !pending && (item.command == null || entry.checked)
+                    setOnCheckedChangeListener { _, checked ->
+                        checklist.set(scope, item.id, checked, "Contrôle manuel")
+                        showTab(3)
+                    }
+                }, LinearLayout.LayoutParams(-1, -2))
+                card.addView(text(if (entry.checked) "Vérifié le ${checklistDate(entry.timestamp)}" else "À vérifier", 12f, if (entry.checked) green else amber))
+                card.addView(text(item.help, 12f, muted).apply { setPadding(0, dp(6), 0, 0) })
+                if (entry.detail.isNotBlank()) card.addView(text(entry.detail, 12f, muted).apply { setPadding(0, dp(6), 0, 0); setTextIsSelectable(true) })
+                item.command?.let { command ->
+                    card.addView(Button(this).apply {
+                        tag = "read_${item.id}"; text = if (pending) "Lecture en cours…" else if (entry.checked) "Relire" else "Lire via OBD-II"
+                        isAllCaps = false; minHeight = dp(48); isEnabled = !pending
+                        contentDescription = "$text : ${item.title}"
+                        setOnClickListener {
+                            if (!isConnected) Toast.makeText(this@MainActivity, "Connectez un ELM327 avant cette lecture", Toast.LENGTH_LONG).show()
+                            else execute(command, item.title)
+                        }
+                    }, LinearLayout.LayoutParams(-1, -2))
+                }
+                add(card)
+            }
+        }
+        rowAction("Nouveau diagnostic", "Remettre à zéro la checklist de ce véhicule", "report", amber) {
+            AlertDialog.Builder(this).setTitle("Recommencer le diagnostic ?")
+                .setMessage("Les cases, dates et résultats de la checklist de ${scope.vehicle} seront effacés. Partagez le rapport pour les conserver. Les autres véhicules gardent leur suivi.")
+                .setNegativeButton("Annuler", null).setPositiveButton("Recommencer") { _, _ ->
+                    checklist.reset(scope); checklistFilter = 0; showTab(3)
+                }.show()
+        }
+        note("Contrôle réalisé", "Une case cochée indique un point contrôlé. Elle ne garantit pas l’absence de défaut. Les lectures OBD se cochent après une réponse valide ; cochez les contrôles manuels après inspection.", amber)
+    }
 
     private var selectedMake = ""
     private var selectedModel = ""
@@ -413,7 +531,8 @@ class MainActivity : Activity() {
         actionable(this, accent, action)
     }
     private fun shareReport() {
-        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, results.text.toString()) }
+        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT,
+            checklistReport() + "\nJOURNAL OBD-II — SESSION ACTUELLE\n" + results.text.toString()) }
         startActivity(Intent.createChooser(send, "Partager le diagnostic"))
     }
     private fun confirmClear() {
@@ -436,6 +555,7 @@ class MainActivity : Activity() {
         when(tab) {
             0 -> {
                 hero(); connectionCard(); vehicleCard()
+                rowAction("Checklist du diagnostic", checklistSummary(), "report", green) { showTab(3) }
                 section("DIAGNOSTIC RAPIDE", "À portée de main")
                 grid(listOf(
                     tile("Codes défauts", "Lire les DTC du moteur", cyan, "engine") { execute("03", "Codes défauts"); showTab(3) },
@@ -479,11 +599,12 @@ class MainActivity : Activity() {
                 note("Lectures à la demande", "Chaque carte interroge le véhicule. La valeur affichée est la dernière réponse reçue, sans acquisition continue.")
             }
             3 -> {
-                pageTitle("03  /  DIAGNOSTIC", "Rapport de session", "Toutes les réponses, réunies dans un journal.")
+                pageTitle("03  /  DIAGNOSTIC", "Checklist du véhicule", "Retrouvez les points vérifiés et ceux qui restent à contrôler.")
+                rowAction("Partager le rapport", "Checklist, dates des contrôles et journal OBD-II", "share") { shareReport() }
+                showChecklist()
                 note(if (isConnected) "Session connectée" else "En attente de connexion", if (history.isEmpty()) "Aucune lecture effectuée dans cette session." else "Le journal conserve les réponses et erreurs de cette session.", if (isConnected) green else cyan, "report")
                 section("JOURNAL OBD-II", "Session actuelle")
                 (results.parent as? android.view.ViewGroup)?.removeView(results); add(results, 12)
-                rowAction("Partager le rapport", "Exporter le journal au format texte", "share") { shareReport() }
                 section("MAINTENANCE")
                 rowAction("Effacer les codes défauts", "Après réparation · une confirmation sera demandée", "engine", red) { confirmClear() }
                 note("Conserver une trace", "Partagez le journal avant toute intervention pour garder les réponses du véhicule.", amber)
@@ -559,7 +680,7 @@ class MainActivity : Activity() {
             elevation = dp(12).toFloat()
         }
         val icons = listOf("home", "car", "bars", "report", "settings")
-        listOf("Accueil", "Véhicule", "Mesures", "Rapport", "Réglages").forEachIndexed { i, label ->
+        listOf("Accueil", "Véhicule", "Mesures", "Diagnostic", "Réglages").forEachIndexed { i, label ->
             nav.addView(column().apply {
                 gravity = Gravity.CENTER; setPadding(dp(2), dp(8), dp(2), dp(8)); minimumHeight = dp(56)
                 addView(icon(icons[i], muted, 23))
@@ -571,9 +692,11 @@ class MainActivity : Activity() {
         root.addView(nav)
         window.statusBarColor = bg; window.navigationBarColor = Color.rgb(7, 17, 29)
         setContentView(root)
+        checklistFilter = savedInstanceState?.getInt("checklist_filter", 0) ?: 0
         showTab(savedInstanceState?.getInt("tab", 0) ?: 0)
     }
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("checklist_filter", checklistFilter)
         outState.putInt("tab", selectedTab); super.onSaveInstanceState(outState)
     }
     private fun log(message: String) = runOnUiThread {
@@ -710,21 +833,39 @@ class MainActivity : Activity() {
         return if (value != null) value + "\nRéponse : " + raw else raw.trim()
     }
     private fun execute(cmd: String, label: String) {
+        val scope = checklistScope()
+        val item = DiagnosticChecklist.ITEMS.firstOrNull { it.command == cmd }
+        val pendingKey = if (scope != null && item != null) "${scope.key}:${scope.session}:$cmd" else null
+        if (pendingKey != null && !pendingChecks.add(pendingKey)) return
+        if (selectedTab == 3) showTab(3)
         thread {
             try {
                 val raw = command(cmd)
                 val reading = decode(cmd, raw)
-                if (cmd.startsWith("01") && !reading.startsWith("Donnée indisponible") &&
-                    reading != raw.trim()) {
-                    runOnUiThread {
-                        latestReadings[label] = reading.substringBefore("\n")
-                        if (selectedTab == 2) showTab(2)
+                val valid = DiagnosticChecklist.validReply(cmd, raw)
+                runOnUiThread {
+                    if (scope != null && item != null && valid) checklist.set(scope, item.id, true, reading)
+                    if (cmd.startsWith("01") && valid && reading != raw.trim() && scope?.key == checklistScope()?.key) {
+                        val measurement = when (cmd) {
+                            "010C" -> "Régime"; "0105" -> "Température"; "0142" -> "Tension module"
+                            "0104" -> "Charge moteur"; "010B" -> "Pression admission"; "0111" -> "Papillon"
+                            else -> label
+                        }
+                        latestReadings[measurement] = reading.substringBefore("\n")
                     }
+                    if (!isDestroyed && selectedTab == 2) showTab(2)
                 }
-                log("$label\n$reading")
+                log("${scope?.vehicle ?: "Sans profil véhicule"}\n$label\n$reading")
             }
             catch (e: Exception) { log("Erreur : ${e.message}") }
+            finally {
+                runOnUiThread {
+                    pendingKey?.let { pendingChecks.remove(it) }
+                    if (!isDestroyed && selectedTab == 3) showTab(3)
+                }
+            }
         }
     }
     override fun onDestroy() { receiver?.let { try { unregisterReceiver(it) } catch (_:Exception) {} }; try { socket?.close() } catch (_:Exception) {}; super.onDestroy() }
 }
+

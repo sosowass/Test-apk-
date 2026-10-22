@@ -1,7 +1,7 @@
 name: Bilal27000diag APK et verification visuelle
 on:
   push:
-    branches: [main, codex/premium-automobile]
+    branches: [codex/vehicle-checklist]
   workflow_dispatch:
 permissions:
   contents: write
@@ -66,7 +66,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Bilal27000diag-0.6.2-APK
+          name: Bilal27000diag-0.6.3-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Enregistrer les captures consultables
@@ -77,7 +77,7 @@ jobs:
             const fs = require('fs');
             if (!fs.existsSync('screenshots') || fs.readdirSync('screenshots').length === 0) return;
             const owner = context.repo.owner, repo = context.repo.repo;
-            const branch = 'codex/design-evidence';
+            const branch = 'codex/checklist-evidence';
             let parent = null;
             try { parent = (await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch})).data.object.sha; }
             catch (e) { if (e.status !== 404) throw e; }
@@ -115,3 +115,4 @@ jobs:
             const commit = await github.rest.git.createCommit({owner, repo, message: 'Android emulator screenshots for ' + context.sha, tree: created.data.sha, parents: parent ? [parent] : []});
             if (parent) await github.rest.git.updateRef({owner, repo, ref: 'heads/' + branch, sha: commit.data.sha});
             else await github.rest.git.createRef({owner, repo, ref: 'refs/heads/' + branch, sha: commit.data.sha});
+
