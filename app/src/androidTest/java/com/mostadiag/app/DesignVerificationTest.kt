@@ -149,11 +149,20 @@ class DesignVerificationTest {
                     (resetTitle.parent.parent as View).performClick()
                     val dialog = WindowInspector.getGlobalWindowViews().first { it.findViewById<View>(android.R.id.button1) != null }
                     dialog.findViewById<View>(android.R.id.button2).performClick()
+                }
+                // AlertDialog dispatches button callbacks through the main message queue.
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
                     assertTrue("Cancel keeps progress", root.findViewWithTag<CheckBox>("check_oil").isChecked)
+                    val resetTitle = descendants(root).filterIsInstance<TextView>().first { it.text == "Nouveau diagnostic" }
                     (resetTitle.parent.parent as View).performClick()
                     WindowInspector.getGlobalWindowViews().first { it.findViewById<View>(android.R.id.button1) != null }
                         .findViewById<View>(android.R.id.button1).performClick()
-                    assertTrue(root.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
+                }
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    assertTrue("Confirmed reset clears progress", activity.window.decorView.findViewWithTag<TextView>("checklist_progress").text.startsWith("0/15"))
                 }
             }
         } finally { profile.edit().clear().commit(); tracking.edit().clear().commit() }
