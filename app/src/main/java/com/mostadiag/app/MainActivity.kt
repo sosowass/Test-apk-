@@ -146,7 +146,9 @@ class MainActivity : Activity() {
         val step = EasyDiagnostic.steps[easyStep]
         val complete = EasyDiagnostic.isComplete(step, entries)
         add(text("Étape ${easyStep + 1} sur ${EasyDiagnostic.steps.size}", 18f, cyan, true).apply { tag = "easy_step"; setPadding(0, dp(12), 0, 0) })
-        add(icon(step.picture, if (complete) green else cyan, if (wide) 100 else 64).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, 4)
+        val pictureSize = dp(if (wide) 100 else 64)
+        content.addView(icon(step.picture, if (complete) green else cyan).apply { tag = "easy_picture" },
+            LinearLayout.LayoutParams(-1, pictureSize).apply { bottomMargin = dp(4) })
         easyHeading(step.title, step.instruction)
         add(easyButton("Écouter la consigne", "easy_listen") { speakInstruction(step.title + ". " + step.instruction) })
         if (step.id == null) {

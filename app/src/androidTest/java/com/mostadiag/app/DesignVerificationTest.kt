@@ -102,7 +102,7 @@ class DesignVerificationTest {
                         val location = IntArray(2); view.getLocationOnScreen(location)
                         assertTrue("Easy mode horizontal overflow: ${view.javaClass.simpleName}", location[0] >= -1 && location[0] + view.width <= screenWidth + 1)
                     }
-                    for (tag in listOf("easy_done", "easy_later", "easy_listen")) {
+                    for (tag in listOf("easy_done", "easy_later", "easy_listen", "easy_picture")) {
                         assertTrue("Large touch target: $tag", root.findViewWithTag<View>(tag).height >= (64 * activity.resources.displayMetrics.density).toInt())
                     }
                 }
