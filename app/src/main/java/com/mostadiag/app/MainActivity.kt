@@ -54,9 +54,14 @@ class MainActivity : Activity() {
     private var easyReadMessage = ""
     private var speech: android.speech.tts.TextToSpeech? = null
     private var speechReady = false
+    private var speechUnavailable = false
     private var pendingSpeech = ""
 
     private fun speakInstruction(message: String) {
+        if (speechUnavailable) {
+            Toast.makeText(this, "La voix française n’est pas disponible. Tu peux lire la consigne à l’écran.", Toast.LENGTH_LONG).show()
+            return
+        }
         pendingSpeech = message
         if (speechReady) {
             speech?.speak(message, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "instruction")
@@ -67,6 +72,7 @@ class MainActivity : Activity() {
                     val language = if (result == android.speech.tts.TextToSpeech.SUCCESS)
                         speech?.setLanguage(java.util.Locale.FRANCE) else null
                     speechReady = language != null && language >= android.speech.tts.TextToSpeech.LANG_AVAILABLE
+                    speechUnavailable = !speechReady
                     if (speechReady) speech?.speak(pendingSpeech, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "instruction")
                     else Toast.makeText(this, "La voix française n’est pas disponible sur ce téléphone. La consigne reste écrite à l’écran.", Toast.LENGTH_LONG).show()
                 }
@@ -75,7 +81,8 @@ class MainActivity : Activity() {
     }
 
     private fun easyButton(label: String, viewTag: String, accent: Int = cyan, action: () -> Unit): Button = Button(this).apply {
-        tag = viewTag; text = label; textSize = 20f; isAllCaps = false; minHeight = dp(64)
+        tag = viewTag; text = if (viewTag.contains("listen") || viewTag == "easy_help") "🔊 $label" else label
+        textSize = 20f; isAllCaps = false; minHeight = dp(64)
         setPadding(dp(16), dp(14), dp(16), dp(14)); setTextColor(bg)
         backgroundTintList = ColorStateList.valueOf(accent)
         setOnClickListener { action() }
@@ -180,7 +187,7 @@ class MainActivity : Activity() {
                 val count = items.count { checklist.entries(scope)[it.id]?.checked == true }
                 easyReadMessage = if (count == items.size) "Les informations sont enregistrées. Tu peux continuer."
                     else "Certaines informations manquent. Tu peux réessayer ou continuer."
-                if (selectedTab == 3) showTab(3)
+                if (selectedTab == 3 && easyStep == 0) showTab(3)
                 return
             }
             easyReadMessage = "Lecture ${index + 1} sur ${items.size}. Attends un peu…"
@@ -1126,7 +1133,7 @@ class MainActivity : Activity() {
         val item = DiagnosticChecklist.ITEMS.firstOrNull { it.command == cmd }
         val pendingKey = if (scope != null && item != null) "${scope.key}:${scope.session}:$cmd" else null
         if (pendingKey != null && !pendingChecks.add(pendingKey)) { onComplete(false); return }
-        if (selectedTab == 3) showTab(3)
+        if (selectedTab == 3 && (!easyMode || easyStep == 0)) showTab(3)
         thread {
             var accepted = false
             try {
