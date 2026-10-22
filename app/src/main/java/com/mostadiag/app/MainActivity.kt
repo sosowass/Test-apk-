@@ -85,7 +85,10 @@ class MainActivity : Activity() {
         textSize = 20f; isAllCaps = false; minHeight = dp(64)
         setPadding(dp(16), dp(14), dp(16), dp(14)); setTextColor(bg)
         backgroundTintList = ColorStateList.valueOf(accent)
-        setOnClickListener { action() }
+        setOnClickListener {
+            if (!viewTag.contains("listen") && viewTag != "easy_help") speech?.stop()
+            action()
+        }
     }
 
     private fun easyHeading(title: String, instruction: String) {
@@ -104,7 +107,7 @@ class MainActivity : Activity() {
                 addView(text(detail, 16f, muted).apply { setPadding(0, dp(6), 0, 0) })
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        actionable(card, cyan, action); add(card)
+        actionable(card, cyan) { speech?.stop(); action() }; add(card)
     }
 
     private fun showEasyHome() {
@@ -403,6 +406,7 @@ class MainActivity : Activity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
             textSize = 18f; minHeight = dp(56)
             setOnClickListener {
+                speech?.stop()
                 val answer = field.text.toString().trim()
                 val maxYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 1
                 if (answer.isBlank() || (stage == 2 && (answer.toIntOrNull() ?: 0) !in 1886..maxYear)) {
@@ -425,6 +429,7 @@ class MainActivity : Activity() {
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
             textSize = 18f; minHeight = dp(56)
             setOnClickListener {
+                speech?.stop()
                 values[stage] = field.text.toString().trim(); dialog.dismiss()
                 if (stage > 0) chooseEasyVehicle(values, stage - 1)
             }

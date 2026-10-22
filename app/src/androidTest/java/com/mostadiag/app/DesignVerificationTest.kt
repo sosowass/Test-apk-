@@ -92,6 +92,8 @@ class DesignVerificationTest {
                     assertEquals("Étape 4 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
                 }
                 scenario.recreate()
+                // Rotation resumes the activity before its first frame is necessarily measured.
+                capture("${format}_easy_pneus")
                 scenario.onActivity { activity ->
                     val root = activity.window.decorView
                     assertEquals("Step retained after recreation", "Étape 4 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
@@ -104,7 +106,6 @@ class DesignVerificationTest {
                         assertTrue("Large touch target: $tag", root.findViewWithTag<View>(tag).height >= (64 * activity.resources.displayMetrics.density).toInt())
                     }
                 }
-                capture("${format}_easy_pneus")
                 scenario.onActivity { activity ->
                     val root = activity.window.decorView
                     descendants(root).filterIsInstance<ScrollView>().first().fullScroll(View.FOCUS_DOWN)
