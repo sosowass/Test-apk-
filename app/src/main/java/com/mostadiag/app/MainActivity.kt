@@ -47,6 +47,209 @@ class MainActivity : Activity() {
     private val checklist by lazy { DiagnosticChecklist(getSharedPreferences("diagnostic_checklist", MODE_PRIVATE)) }
     private var checklistFilter = 0
     private val pendingChecks = mutableSetOf<String>()
+    private var easyMode = true
+    private var easyStep = -1
+    private var easyScopeId = ""
+    private var activeBatch: String? = null
+    private var easyReadMessage = ""
+    private var speech: android.speech.tts.TextToSpeech? = null
+    private var speechReady = false
+    private var pendingSpeech = ""
+
+    private fun speakInstruction(message: String) {
+        pendingSpeech = message
+        if (speechReady) {
+            speech?.speak(message, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "instruction")
+        } else if (speech == null) {
+            speech = android.speech.tts.TextToSpeech(this) { result ->
+                runOnUiThread {
+                    if (isDestroyed) return@runOnUiThread
+                    val language = if (result == android.speech.tts.TextToSpeech.SUCCESS)
+                        speech?.setLanguage(java.util.Locale.FRANCE) else null
+                    speechReady = language != null && language >= android.speech.tts.TextToSpeech.LANG_AVAILABLE
+                    if (speechReady) speech?.speak(pendingSpeech, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "instruction")
+                    else Toast.makeText(this, "La voix française n’est pas disponible sur ce téléphone. La consigne reste écrite à l’écran.", Toast.LENGTH_LONG).show()
+                }
+            }
+        } else Toast.makeText(this, "La voix se prépare. Tu peux aussi lire la consigne.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun easyButton(label: String, viewTag: String, accent: Int = cyan, action: () -> Unit): Button = Button(this).apply {
+        tag = viewTag; text = label; textSize = 20f; isAllCaps = false; minHeight = dp(64)
+        setPadding(dp(16), dp(14), dp(16), dp(14)); setTextColor(bg)
+        backgroundTintList = ColorStateList.valueOf(accent)
+        setOnClickListener { action() }
+    }
+
+    private fun easyHeading(title: String, instruction: String) {
+        add(text(title, 28f, Color.WHITE, true).apply { setPadding(0, dp(12), 0, dp(6)) })
+        add(text(instruction, 17f, muted))
+    }
+
+    private fun easyAction(title: String, detail: String, kind: String, viewTag: String, action: () -> Unit) {
+        val card = LinearLayout(this).apply {
+            tag = viewTag; gravity = Gravity.CENTER_VERTICAL; background = surface()
+            minimumHeight = dp(88); setPadding(dp(16), dp(18), dp(16), dp(18))
+            addView(icon(kind, cyan, 36))
+            addView(column().apply {
+                setPadding(dp(16), 0, 0, 0)
+                addView(text(title, 20f, Color.WHITE, true))
+                addView(text(detail, 16f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        actionable(card, cyan, action); add(card)
+    }
+
+    private fun showEasyHome() {
+        easyHeading("On commence ?", "Je te guide, une chose à la fois.")
+        add(easyButton("Commencer", "easy_start", green) {
+            if (checklistScope() == null) chooseVehicle() else { easyStep = -1; showTab(3) }
+        })
+        val scope = checklistScope()
+        easyAction("Ma voiture", scope?.vehicle ?: "Choisir la voiture", "car", "easy_vehicle") { chooseVehicle() }
+        easyAction(if (isConnected) "Boîtier connecté" else "Brancher le boîtier",
+            if (isConnected) "Le téléphone peut lire la voiture." else "Le petit appareil qui relie la voiture au téléphone.", "bluetooth", "easy_connect") { connect() }
+        easyAction("Ce qui est fait", scope?.let { "${checklist.entries(it).values.count { entry -> entry.checked }} contrôles enregistrés" }
+            ?: "Tes contrôles seront gardés ici.", "report", "easy_results") { showTab(5) }
+        add(easyButton("Écouter l’aide", "easy_listen_home") {
+            speakInstruction("Choisis la voiture. Branche le petit boîtier sous le volant. Puis touche Commencer. Je te guide, une chose à la fois.")
+        })
+    }
+
+    private fun showEasyGuide() {
+        val scope = checklistScope()
+        if (scope == null) {
+            easyHeading("Quelle voiture ?", "Choisis d’abord la voiture à vérifier.")
+            add(easyButton("Choisir la voiture", "easy_choose_first", green) { chooseVehicle() })
+            return
+        }
+        val entries = checklist.entries(scope)
+        val scopeId = "${scope.key}:${scope.session}"
+        if (scopeId != easyScopeId) { easyScopeId = scopeId; easyStep = -1; easyReadMessage = "" }
+        if (easyStep < 0) easyStep = EasyDiagnostic.firstUnfinished(entries)
+        if (easyStep >= EasyDiagnostic.steps.size) {
+            easyHeading("Le tour est terminé", "Regarde ce qui est fait et ce qui reste à faire.")
+            add(easyButton("Voir le résultat", "easy_finish", green) { showTab(5) })
+            add(easyButton("Revenir au début", "easy_back_start") { easyStep = 0; showTab(3) })
+            return
+        }
+        val step = EasyDiagnostic.steps[easyStep]
+        val complete = if (step.id == null) DiagnosticChecklist.ITEMS.filter { it.command != null }.all { entries[it.id]?.checked == true }
+            else entries[step.id]?.checked == true
+        add(text("Étape ${easyStep + 1} sur ${EasyDiagnostic.steps.size}", 18f, cyan, true).apply { tag = "easy_step"; setPadding(0, dp(12), 0, 0) })
+        add(icon(step.picture, if (complete) green else cyan, if (wide) 100 else 64).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, 4)
+        easyHeading(step.title, step.instruction)
+        add(easyButton("Écouter la consigne", "easy_listen") { speakInstruction(step.title + ". " + step.instruction) })
+        if (step.id == null) {
+            val count = DiagnosticChecklist.ITEMS.count { it.command != null && entries[it.id]?.checked == true }
+            add(text("$count informations reçues sur 9", 18f, if (complete) green else muted).apply { tag = "easy_read_progress"; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE })
+            if (easyReadMessage.isNotBlank()) add(text(easyReadMessage, 17f, amber).apply { tag = "easy_read_message" })
+            val reading = activeBatch != null
+            add(easyButton(if (!isConnected) "Relier le boîtier" else if (reading) "Lecture en cours…" else "Lire la voiture", "easy_read", green) {
+                if (!isConnected) connect() else readAllEasy(scope)
+            }.apply { isEnabled = !reading })
+            if (reading) add(easyButton("Arrêter après cette lecture", "easy_stop", amber) {
+                activeBatch = null; easyReadMessage = "La lecture en cours va se terminer. Les informations reçues sont gardées."; showTab(3)
+            })
+            add(easyButton("Continuer", "easy_next") { easyStep++; easyReadMessage = ""; showTab(3) })
+        } else {
+            if (complete) add(text("Déjà fait · ${checklistDate(entries.getValue(step.id).timestamp)}", 17f, green))
+            add(easyButton(if (complete) "C’est déjà fait · Continuer" else "C’est fait", "easy_done", green) {
+                if (!complete) checklist.set(scope, step.id, true, "Contrôle manuel")
+                easyStep++; showTab(3)
+            })
+            if (complete) add(easyButton("Remettre à faire", "easy_undo", amber) { checklist.set(scope, step.id, false); showTab(3) })
+            add(easyButton("Plus tard", "easy_later") { easyStep++; showTab(3) })
+        }
+        if (easyStep > 0) add(easyButton("Étape d’avant", "easy_previous") { easyStep--; showTab(3) })
+    }
+
+    private fun readAllEasy(scope: DiagnosticChecklist.Scope) {
+        if (activeBatch != null) return
+        val token = UUID.randomUUID().toString()
+        activeBatch = token
+        val items = DiagnosticChecklist.ITEMS.filter { it.command != null }
+        fun next(index: Int) {
+            val current = checklistScope()
+            if (isDestroyed || activeBatch != token) return
+            if (current == null || current.key != scope.key || current.session != scope.session) {
+                activeBatch = null; return
+            }
+            if (index >= items.size) {
+                activeBatch = null
+                val count = items.count { checklist.entries(scope)[it.id]?.checked == true }
+                easyReadMessage = if (count == items.size) "Les informations sont enregistrées. Tu peux continuer."
+                    else "Certaines informations manquent. Tu peux réessayer ou continuer."
+                if (selectedTab == 3) showTab(3)
+                return
+            }
+            easyReadMessage = "Lecture ${index + 1} sur ${items.size}. Attends un peu…"
+            execute(requireNotNull(items[index].command), items[index].title) { next(index + 1) }
+        }
+        next(0)
+    }
+
+    private fun showEasyResults() {
+        val scope = checklistScope()
+        if (scope == null) {
+            easyHeading("Rien pour le moment", "Tes contrôles apparaîtront ici.")
+            add(easyButton("Commencer", "easy_result_start", green) { chooseVehicle() })
+            return
+        }
+        val entries = checklist.entries(scope)
+        val done = entries.values.count { it.checked }
+        easyHeading("Ce qui est fait", scope.vehicle)
+        add(text("$done sur 15 contrôles faits", 24f, green, true).apply { tag = "easy_result_count" })
+        add(text("${15 - done} encore à faire", 18f, amber))
+        add(easyButton("Reprendre les contrôles", "easy_resume", green) { easyStep = -1; showTab(3) })
+        add(easyButton("Partager le résultat", "easy_share") { shareReport() })
+        add(text("Fait veut dire vérifié. Cela ne veut pas dire que la voiture n’a aucun problème.", 17f, muted))
+        DiagnosticChecklist.ITEMS.forEach { item ->
+            val checked = entries[item.id]?.checked == true
+            val title = EasyDiagnostic.steps.firstOrNull { it.id == item.id }?.title ?: when (item.id) {
+                "vin" -> "Numéro de la voiture"; "protocol" -> "Liaison avec la voiture"; "dtc" -> "Messages de panne"
+                "rpm" -> "Rythme du moteur"; "temperature" -> "Chaleur du moteur"; "voltage" -> "Électricité du moteur"
+                "load" -> "Effort du moteur"; "intake" -> "Air dans le moteur"; else -> "Arrivée d’air"
+            }
+            add(text("${if (checked) "✓ Fait" else "À faire"} · $title", 18f, if (checked) green else muted).apply { setPadding(dp(4), dp(10), dp(4), dp(10)) })
+        }
+        add(easyButton("Tout recommencer", "easy_reset", amber) {
+            AlertDialog.Builder(this).setTitle("Tout recommencer pour cette voiture ?")
+                .setMessage("Les cases seront remises à zéro. Partage le résultat avant si tu veux le garder.")
+                .setNegativeButton("Garder mes cases", null).setPositiveButton("Recommencer") { _, _ ->
+                    activeBatch = null; checklist.reset(scope); easyStep = -1; easyReadMessage = ""; showTab(3)
+                }.show()
+        })
+    }
+
+    private fun showEasySettings() {
+        easyHeading("Un coup de main ?", "Les réglages utiles sont ici.")
+        easyAction("Choisir la voiture", "Marque, modèle et année", "car", "easy_change_vehicle") { chooseVehicle() }
+        easyAction("Relier le boîtier", "Branche-le sous le volant, puis choisis son nom.", "bluetooth", "easy_pair") { connect() }
+        add(easyButton("Écouter l’aide", "easy_help") { speakInstruction("Garde la voiture à l’arrêt. Branche le petit boîtier sous le volant. Touche Relier le boîtier puis choisis son nom dans la liste.") })
+        easyAction("Tous les outils", "Ouvrir les mesures et les réglages techniques.", "settings", "easy_advanced") { changeMode(false) }
+    }
+
+    private fun changeMode(simple: Boolean) {
+        activeBatch = null; speech?.stop(); easyMode = simple
+        getSharedPreferences("interface", MODE_PRIVATE).edit().putBoolean("easy", simple).apply()
+        rebuildNavigation(); showTab(0)
+    }
+
+    private fun rebuildNavigation() {
+        nav.removeAllViews()
+        val routes = if (easyMode) listOf(Triple(0, "Accueil", "home"), Triple(3, "Vérifier", "shield"), Triple(5, "Résultat", "report"))
+            else listOf(Triple(0, "Accueil", "home"), Triple(1, "Véhicule", "car"), Triple(2, "Mesures", "bars"), Triple(3, "Diagnostic", "report"), Triple(4, "Réglages", "settings"))
+        routes.forEach { (route, label, picture) ->
+            nav.addView(column().apply {
+                gravity = Gravity.CENTER; setPadding(dp(2), dp(8), dp(2), dp(8)); minimumHeight = dp(64)
+                addView(icon(picture, muted, if (easyMode) 28 else 23))
+                addView(text(label, if (easyMode) 16f else 10f, muted, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(5), 0, 0) })
+                tag = "tab_$route"; contentDescription = label
+                actionable(this) { speech?.stop(); showTab(route) }
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(2); marginEnd = dp(2) })
+        }
+    }
 
     // Use the saved profile: browsing a brand must not move the diagnostic to another vehicle.
     private fun checklistScope(): DiagnosticChecklist.Scope? {
@@ -167,7 +370,65 @@ class MainActivity : Activity() {
     private var selectedModel = ""
     private var selectedYear = 0
     private val vehicleCatalog by lazy { VehicleCatalog(assets) }
+    private fun chooseEasyVehicle(values: MutableList<String> = mutableListOf(selectedMake, selectedModel, if (selectedYear > 0) selectedYear.toString() else ""), stage: Int = 0) {
+        val prompts = listOf("Quelle est la marque ?", "Quel est le modèle ?", "De quelle année ?")
+        val examples = listOf("Par exemple : Renault", "Par exemple : Clio", "Regarde sur la carte grise.")
+        val form = column().apply { setPadding(dp(20), dp(12), dp(20), dp(12)) }
+        form.addView(text("${stage + 1} sur 3 · ${examples[stage]}", 17f, muted))
+        val options = when (stage) {
+            0 -> vehicleCatalog.makes
+            1 -> vehicleCatalog.models(values[0]).map { it.name }
+            else -> vehicleCatalog.yearSuggestions(values[0], values[1])
+        }
+        val field = AutoCompleteTextView(this).apply {
+            tag = "easy_vehicle_field_$stage"; textSize = 22f; minHeight = dp(64)
+            setTextColor(Color.WHITE); setHintTextColor(muted); hint = examples[stage]
+            setSingleLine(true); threshold = 1; dropDownHeight = dp(180)
+            setDropDownBackgroundDrawable(rounded(panel)); setText(values[stage])
+            if (stage == 2) inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setAdapter(VehicleSuggestionsAdapter(this@MainActivity, options, if (stage == 0) VehicleCatalog.aliases else emptyMap()))
+            setOnClickListener { showDropDown() }
+        }
+        form.addView(field, LinearLayout.LayoutParams(-1, -2))
+        form.addView(easyButton("Écouter la question", "easy_vehicle_listen") { speakInstruction(prompts[stage] + ". " + examples[stage]) })
+        val dialog = AlertDialog.Builder(this).setTitle(prompts[stage])
+            .setView(ScrollView(this).apply { addView(form) })
+            .setNegativeButton(if (stage == 0) "Annuler" else "Retour", null)
+            .setPositiveButton(if (stage == 2) "C’est ma voiture" else "Suivant", null).create()
+        dialog.show(); dialog.window?.setBackgroundDrawable(rounded(panel))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+            textSize = 18f; minHeight = dp(56)
+            setOnClickListener {
+                val answer = field.text.toString().trim()
+                val maxYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 1
+                if (answer.isBlank() || (stage == 2 && (answer.toIntOrNull() ?: 0) !in 1886..maxYear)) {
+                    field.error = if (stage == 2) "Écris une année entre 1886 et $maxYear." else "Choisis un nom ou écris-le ici."
+                    return@setOnClickListener
+                }
+                val previous = values[stage]
+                values[stage] = if (stage == 0) vehicleCatalog.canonicalMake(answer) ?: answer else answer
+                if (stage == 0 && !previous.equals(values[0], true)) { values[1] = ""; values[2] = "" }
+                dialog.dismiss()
+                if (stage < 2) chooseEasyVehicle(values, stage + 1)
+                else {
+                    selectedMake = values[0]; selectedModel = values[1]; selectedYear = values[2].toInt()
+                    getSharedPreferences("vehicle", MODE_PRIVATE).edit().putString("make", selectedMake)
+                        .putString("model", selectedModel).putInt("year", selectedYear).apply()
+                    easyStep = -1; showTab(0)
+                }
+            }
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+            textSize = 18f; minHeight = dp(56)
+            setOnClickListener {
+                values[stage] = field.text.toString().trim(); dialog.dismiss()
+                if (stage > 0) chooseEasyVehicle(values, stage - 1)
+            }
+        }
+    }
+
     private fun chooseVehicle() {
+        if (easyMode) { chooseEasyVehicle(); return }
         val form = column().apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
         fun field(label: String, fieldTag: String) = AutoCompleteTextView(this).apply {
             tag = fieldTag
@@ -547,12 +808,15 @@ class MainActivity : Activity() {
         content.removeAllViews()
         for (i in 0 until nav.childCount) {
             val button = nav.getChildAt(i) as LinearLayout
-            (button.getChildAt(0) as NeonIcon).apply { tint = if (i == tab) cyan else muted; invalidate() }
-            (button.getChildAt(1) as TextView).setTextColor(if (i == tab) cyan else muted)
-            button.background = if (i == tab) rounded(Color.rgb(9, 39, 56), Color.rgb(21, 76, 97), 14f) else null
-            button.isSelected = i == tab
+            val selected = button.tag == "tab_$tab"
+            (button.getChildAt(0) as NeonIcon).apply { tint = if (selected) cyan else muted; invalidate() }
+            (button.getChildAt(1) as TextView).setTextColor(if (selected) cyan else muted)
+            button.background = if (selected) rounded(Color.rgb(9, 39, 56), Color.rgb(21, 76, 97), 14f) else null
+            button.isSelected = selected
         }
-        when(tab) {
+        if (easyMode) {
+            when (tab) { 3 -> showEasyGuide(); 4 -> showEasySettings(); 5 -> showEasyResults(); else -> showEasyHome() }
+        } else when(tab) {
             0 -> {
                 hero(); connectionCard(); vehicleCard()
                 rowAction("Checklist du diagnostic", checklistSummary(), "report", green) { showTab(3) }
@@ -611,6 +875,7 @@ class MainActivity : Activity() {
             }
             4 -> {
                 pageTitle("04  /  PRÉFÉRENCES", "Paramètres", "Votre atelier, vos repères.")
+                easyAction("Revenir au mode facile", "Gros boutons et une étape à la fois", "home", "enable_easy") { changeMode(true) }
                 connectionCard()
                 section("CONNEXION")
                 rowAction("Choisir un adaptateur", "Bluetooth Classic · ELM327", "bluetooth") { connect() }
@@ -632,10 +897,13 @@ class MainActivity : Activity() {
             content.alpha = .55f; content.translationY = dp(6).toFloat()
             content.animate().alpha(1f).translationY(0f).setDuration(200).start()
         }
-        scroll.post { scroll.scrollTo(0, previousY) }
+        scroll.post { scroll.scrollTo(0, if (easyMode) 0 else previousY) }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        easyMode = getSharedPreferences("interface", MODE_PRIVATE).getBoolean("easy", true)
+        easyStep = savedInstanceState?.getInt("easy_step", -1) ?: -1
+        easyScopeId = savedInstanceState?.getString("easy_scope", "") ?: ""
         val prefs = getSharedPreferences("vehicle", MODE_PRIVATE)
         selectedMake = prefs.getString("make", "") ?: ""; selectedModel = prefs.getString("model", "") ?: ""; selectedYear = prefs.getInt("year", 0)
         val root = column().apply { setBackgroundColor(bg) }
@@ -650,7 +918,7 @@ class MainActivity : Activity() {
                 text = name; letterSpacing = -.02f; setSingleLine(true)
                 setAutoSizeTextTypeUniformWithConfiguration(10, if (wide) 23 else 19, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
             })
-            addView(text("DIAGNOSTIC AUTOMOBILE", 8f, muted, true).apply { letterSpacing = .17f; setPadding(0, dp(4), 0, 0) })
+            addView(text("VÉRIFIER MA VOITURE", 10f, muted, true).apply { setPadding(0, dp(4), 0, 0) })
         }, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(FrameLayout(this).apply {
             addView(NeonIcon(this@MainActivity, "settings", muted), FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
@@ -679,16 +947,7 @@ class MainActivity : Activity() {
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.rgb(18, 33, 49), Color.rgb(7, 17, 29)))
             elevation = dp(12).toFloat()
         }
-        val icons = listOf("home", "car", "bars", "report", "settings")
-        listOf("Accueil", "Véhicule", "Mesures", "Diagnostic", "Réglages").forEachIndexed { i, label ->
-            nav.addView(column().apply {
-                gravity = Gravity.CENTER; setPadding(dp(2), dp(8), dp(2), dp(8)); minimumHeight = dp(56)
-                addView(icon(icons[i], muted, 23))
-                addView(text(label, 10f, muted, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(5), 0, 0) })
-                tag = "tab_$i"; contentDescription = label
-                actionable(this) { showTab(i) }
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(2); marginEnd = dp(2) })
-        }
+        rebuildNavigation()
         root.addView(nav)
         window.statusBarColor = bg; window.navigationBarColor = Color.rgb(7, 17, 29)
         setContentView(root)
@@ -696,6 +955,7 @@ class MainActivity : Activity() {
         showTab(savedInstanceState?.getInt("tab", 0) ?: 0)
     }
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("easy_step", easyStep); outState.putString("easy_scope", easyScopeId)
         outState.putInt("checklist_filter", checklistFilter)
         outState.putInt("tab", selectedTab); super.onSaveInstanceState(outState)
     }
@@ -711,22 +971,33 @@ class MainActivity : Activity() {
         else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 10); return }
+        if (adapter == null) {
+            Toast.makeText(this, "Ce téléphone n’a pas de Bluetooth. Les contrôles manuels restent disponibles.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (adapter?.isEnabled != true) {
-            Toast.makeText(this, "Activez le Bluetooth puis relancez la recherche", Toast.LENGTH_LONG).show()
+            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), 20)
             return
         }
         val devices = linkedMapOf<String, BluetoothDevice>()
         val labels = mutableListOf<String>()
-        val listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, labels)
+        val listAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, labels) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                super.getView(position, convertView, parent).apply {
+                    minimumHeight = dp(64)
+                    if (this is TextView) textSize = 18f
+                }
+        }
         val list = ListView(this).apply { adapter = listAdapter }
         fun add(d: BluetoothDevice) {
             if (devices.containsKey(d.address)) return
             devices[d.address] = d
-            labels.add((d.name ?: "Bluetooth") + " • " + d.address)
+            labels.add((d.name ?: "Boîtier sans nom") + if (easyMode) " · " + d.address.takeLast(5) else " • " + d.address)
             listAdapter.notifyDataSetChanged()
         }
         adapter?.bondedDevices?.forEach { add(it) }
-        val dialog = AlertDialog.Builder(this).setTitle("Rechercher un ELM327")
+        val dialog = AlertDialog.Builder(this).setTitle(if (easyMode) "Choisis le boîtier" else "Rechercher un ELM327")
+            .setMessage(if (easyMode) "Branche le boîtier dans la voiture. Touche son nom quand il apparaît dans la liste." else "Choisir un adaptateur Bluetooth Classic.")
             .setView(list).setNegativeButton("Fermer", null).create()
         fun cleanup() {
             try { adapter?.cancelDiscovery() } catch (_: Exception) {}
@@ -766,6 +1037,17 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Recherche impossible. Vérifiez les autorisations Bluetooth.", Toast.LENGTH_LONG).show()
         }
     }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 10) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) connect()
+            else Toast.makeText(this, "Autorise le Bluetooth pour relier le téléphone à la voiture. Tu peux faire les contrôles manuels en attendant.", Toast.LENGTH_LONG).show()
+        }
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 20 && resultCode == RESULT_OK) connect()
+    }
     private fun connectDevice(target: BluetoothDevice) {
             thread {
                 try {
@@ -780,14 +1062,21 @@ class MainActivity : Activity() {
                     if (reset.isBlank() || reset.contains("ERROR", ignoreCase = true)) error("Boîtier sans réponse valide")
                     command("ATE0"); command("ATL0"); command("ATS0"); command("ATSP0")
                     isConnected = true
-                    runOnUiThread { status.text = "● Connecté : ${target.name}" }
+                    runOnUiThread {
+                        status.text = "● Connecté : ${target.name}"
+                        if (easyMode && selectedTab in listOf(0, 3)) showTab(selectedTab)
+                    }
                     log("Connexion établie. Protocole automatique activé.")
                 } catch (e: Exception) {
                     isConnected = false
                     latestReadings.clear()
                     try { socket?.close() } catch (_: Exception) {}
                     input = null; output = null; socket = null
-                    runOnUiThread { status.text = "● HORS LIGNE • ELM327" }
+                    runOnUiThread {
+                        status.text = "● HORS LIGNE • ELM327"
+                        easyReadMessage = "Le boîtier n’est pas relié. Vérifie qu’il est branché, puis réessaie."
+                        if (easyMode && selectedTab in listOf(0, 3)) showTab(selectedTab)
+                    }
                     log("Échec de connexion : ${e.message}")
                 }
             }
@@ -832,17 +1121,19 @@ class MainActivity : Activity() {
         }
         return if (value != null) value + "\nRéponse : " + raw else raw.trim()
     }
-    private fun execute(cmd: String, label: String) {
+    private fun execute(cmd: String, label: String, onComplete: (Boolean) -> Unit = {}) {
         val scope = checklistScope()
         val item = DiagnosticChecklist.ITEMS.firstOrNull { it.command == cmd }
         val pendingKey = if (scope != null && item != null) "${scope.key}:${scope.session}:$cmd" else null
-        if (pendingKey != null && !pendingChecks.add(pendingKey)) return
+        if (pendingKey != null && !pendingChecks.add(pendingKey)) { onComplete(false); return }
         if (selectedTab == 3) showTab(3)
         thread {
+            var accepted = false
             try {
                 val raw = command(cmd)
                 val reading = decode(cmd, raw)
                 val valid = DiagnosticChecklist.validReply(cmd, raw)
+                accepted = valid
                 runOnUiThread {
                     if (scope != null && item != null && valid) checklist.set(scope, item.id, true, reading)
                     val currentScope = checklistScope()
@@ -855,7 +1146,7 @@ class MainActivity : Activity() {
                         }
                         latestReadings[measurement] = reading.substringBefore("\n")
                     }
-                    if (!isDestroyed && selectedTab in listOf(0, 2)) showTab(selectedTab)
+                    if (!isDestroyed && selectedTab in listOf(0, 2, 5)) showTab(selectedTab)
                 }
                 log("${scope?.vehicle ?: "Sans profil véhicule"}\n$label\n$reading")
             }
@@ -863,11 +1154,19 @@ class MainActivity : Activity() {
             finally {
                 runOnUiThread {
                     pendingKey?.let { pendingChecks.remove(it) }
-                    if (!isDestroyed && selectedTab == 3) showTab(3)
+                    if (!isDestroyed) {
+                        if (selectedTab == 3 && (!easyMode || easyStep == 0)) showTab(3)
+                        onComplete(accepted)
+                    }
                 }
             }
         }
     }
-    override fun onDestroy() { receiver?.let { try { unregisterReceiver(it) } catch (_:Exception) {} }; try { socket?.close() } catch (_:Exception) {}; super.onDestroy() }
+    override fun onDestroy() {
+        activeBatch = null; speech?.stop(); speech?.shutdown(); speech = null
+        receiver?.let { try { unregisterReceiver(it) } catch (_:Exception) {} }
+        try { socket?.close() } catch (_:Exception) {}
+        super.onDestroy()
+    }
 }
 

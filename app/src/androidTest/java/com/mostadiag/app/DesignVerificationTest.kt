@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.concurrent.CountDownLatch
@@ -23,6 +24,10 @@ import java.util.concurrent.TimeUnit
 /** Android rendering and interaction checks. Never injects vehicle readings. */
 @RunWith(AndroidJUnit4::class)
 class DesignVerificationTest {
+    @Before fun keepExistingToolChecksInAdvancedMode() {
+        InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("interface", 0)
+            .edit().putBoolean("easy", false).commit()
+    }
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private fun descendants(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
@@ -37,6 +42,104 @@ class DesignVerificationTest {
         val folder = File(instrumentation.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(folder, "$name.webp").outputStream().use { bitmap.compress(Bitmap.CompressFormat.WEBP, 90, it) }
         bitmap.recycle()
+    }
+    @android.annotation.TargetApi(29)
+    @Test fun easyModeGuidesWithoutMarkingSkippedControls() {
+        val context = instrumentation.targetContext
+        val profile = context.getSharedPreferences("vehicle", 0)
+        val tracking = context.getSharedPreferences("diagnostic_checklist", 0)
+        val appearance = context.getSharedPreferences("interface", 0)
+        profile.edit().clear().commit(); tracking.edit().clear().commit(); appearance.edit().clear().commit()
+        val format = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
+        fun currentField(stage: Int): AutoCompleteTextView = WindowInspector.getGlobalWindowViews()
+            .first { it.findViewWithTag<View>("easy_vehicle_field_$stage") != null }
+            .findViewWithTag("easy_vehicle_field_$stage")
+        try {
+            ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    assertNotNull("Simple navigation by default", root.findViewWithTag<View>("tab_5"))
+                    assertNull("Measurements are in the optional tools", root.findViewWithTag<View>("tab_2"))
+                    root.findViewWithTag<View>("easy_start").performClick()
+                    currentField(0).apply {
+                        setText("Renault", false)
+                        rootView.findViewById<View>(android.R.id.button1).performClick()
+                    }
+                    currentField(1).apply {
+                        setText("Clio", false)
+                        rootView.findViewById<View>(android.R.id.button1).performClick()
+                    }
+                    currentField(2).apply {
+                        setText("9999", false)
+                        rootView.findViewById<View>(android.R.id.button1).performClick()
+                        assertNotNull("Invalid year keeps the question open", error)
+                        setText("2018", false)
+                        rootView.findViewById<View>(android.R.id.button1).performClick()
+                    }
+                    assertEquals("Renault", profile.getString("make", ""))
+                    assertEquals("Clio", profile.getString("model", ""))
+                    assertEquals(2018, profile.getInt("year", 0))
+                }
+                capture("${format}_easy_accueil")
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    root.findViewWithTag<View>("easy_start").performClick()
+                    assertEquals("Étape 1 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
+                    root.findViewWithTag<View>("easy_next").performClick()
+                    assertEquals("Étape 2 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
+                    root.findViewWithTag<View>("easy_done").performClick()
+                    root.findViewWithTag<View>("easy_later").performClick()
+                    assertEquals("Étape 4 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
+                }
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    assertEquals("Step retained after recreation", "Étape 4 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
+                    val screenWidth = activity.resources.displayMetrics.widthPixels
+                    descendants(root).filter { it.visibility == View.VISIBLE && it.width > 0 }.forEach { view ->
+                        val location = IntArray(2); view.getLocationOnScreen(location)
+                        assertTrue("Easy mode horizontal overflow: ${view.javaClass.simpleName}", location[0] >= -1 && location[0] + view.width <= screenWidth + 1)
+                    }
+                    for (tag in listOf("easy_done", "easy_later", "easy_listen")) {
+                        assertTrue("Large touch target: $tag", root.findViewWithTag<View>(tag).height >= (64 * activity.resources.displayMetrics.density).toInt())
+                    }
+                }
+                capture("${format}_easy_pneus")
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    descendants(root).filterIsInstance<ScrollView>().first().fullScroll(View.FOCUS_DOWN)
+                }
+                capture("${format}_easy_boutons")
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    root.findViewWithTag<View>("tab_5").performClick()
+                    assertEquals("Skipped OBD and coolant stay unchecked", "1 sur 15 contrôles faits", root.findViewWithTag<TextView>("easy_result_count").text.toString())
+                }
+                capture("${format}_easy_resultat")
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    root.findViewWithTag<View>("easy_resume").performClick()
+                    assertEquals("Resume starts at the first unfinished step", "Étape 1 sur 7", root.findViewWithTag<TextView>("easy_step").text.toString())
+                    // Open the settings via its existing header entry point.
+                    descendants(root).first { it.contentDescription == "Ouvrir les paramètres" }.performClick()
+                    root.findViewWithTag<View>("easy_advanced").performClick()
+                    assertNotNull(root.findViewWithTag<View>("tab_2"))
+                    root.findViewWithTag<View>("tab_4").performClick()
+                    root.findViewWithTag<View>("enable_easy").performClick()
+                    assertNotNull(root.findViewWithTag<View>("tab_5"))
+                    root.findViewWithTag<View>("tab_5").performClick()
+                    assertTrue("Mode switching retains progress", root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 15"))
+                }
+            }
+            ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+                scenario.onActivity { activity ->
+                    val root = activity.window.decorView
+                    assertNotNull("Simple mode remains selected after relaunch", root.findViewWithTag<View>("tab_5"))
+                    root.findViewWithTag<View>("tab_5").performClick()
+                    assertTrue(root.findViewWithTag<TextView>("easy_result_count").text.startsWith("1 sur 15"))
+                }
+            }
+        } finally { profile.edit().clear().commit(); tracking.edit().clear().commit(); appearance.edit().putBoolean("easy", false).commit() }
     }
     @Test fun checklistPersistsAndKeepsVehiclesAndNewDiagnosticsSeparate() {
         val context = instrumentation.targetContext
