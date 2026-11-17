@@ -21,30 +21,10 @@ def replace_section(src,start,end,replacement,label):
     if a<0 or b<0:raise RuntimeError("V5 missing "+label)
     return src[:a]+replacement+"\n"+src[b:]
 
-html=html_path.read_text()
-html,n=re.subn(r'<div class="video-feature" id="videoFeature">.*?</div></section>\s*<div class="menu"',"""<div class="video-feature" id="videoFeature">
- <div class="local-film-container">
-  <video id="showcaseFilm" autoplay muted loop playsinline preload="auto" poster="media/toulouse.webp">
-   <source src="media/toulouse-hyperlapse-v5.mp4" type="video/mp4">
-  </video>
- </div>
- <div class="video-credit"><span>Images : <strong>Around the Brick · Toulouse</strong> · © Kirill Neiezhmakov / HyperlapsePro</span><button class="video-open" id="openYoutube">▶ Film original</button></div>
-</div></section>
-<div class="menu" """,html,count=1,flags=re.S)
-if n!=1:raise RuntimeError("Cannot replace V4 film area")
-html_path.write_text(html)
-
+# Keep the official YouTube player from V4: preserves controls and creator credit.
+# The video end marker is added below; no third-party file is downloaded by CI.
 js=js_path.read_text()
-js=replace_section(js,"const youtubeVideoId=","function showHome()", """const youtubeUrl='https://www.youtube.com/watch?v=TBCqQmnsNFY';
-function startYoutube(){
- const v=$('showcaseFilm');
- if(!v||page||document.hidden||!$('screenSaver').classList.contains('hidden'))return;
- $('heroMovie').pause();
- v.play().catch(()=>{$('heroMovie').play().catch(()=>{});});
-}
-function stopYoutube(){const v=$('showcaseFilm');if(v)v.pause();}
-window.stopYoutube=stopYoutube;
-""","video controller")
+js=replace_once(js,"&playsinline=1&enablejsapi=1","&end=73&playsinline=1&enablejsapi=1","YouTube stop before last 10 seconds")
 new_apps=r"""
 function appsPage(){
  const t={
@@ -350,5 +330,5 @@ manifest_path.write_text(manifest)
 assert 'class="agenda-tile-grid"' not in html # JS creates it at runtime
 assert 'OpenAgenda via Opendatasoft' in java
 assert 'premium-featured-row' in js
-assert 'toulouse-hyperlapse-v5.mp4' in html
-print("V5 patch complete - curated TV apps, multi-event data, premium agenda, 73s local film, all 3 languages")
+assert '&end=73' in js
+print("V5 patch complete - curated TV apps, multi-event data, premium agenda, 73s official YouTube playback, all 3 languages")
