@@ -1,13 +1,7 @@
 plugins { id 'com.android.application' }
 android {
- namespace 'com.o31languedoc.tvtest'
+ namespace 'com.o31languedoc.tvpremium'
  compileSdk 35
- defaultConfig {
-  applicationId 'com.o31languedoc.tvtest'
-  minSdk 23
-  targetSdk 32
-  versionCode 1
-  versionName '1.0-essai'
- }
+ defaultConfig { applicationId 'com.o31languedoc.tvpremium'; minSdk 23; targetSdk 32; versionCode 2; versionName '2.0-premium' }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }

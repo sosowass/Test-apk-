@@ -1,4 +1,4 @@
-name: Build O31 Xiaomi TV test APK
+name: O31 Premium Xiaomi Android TV APK
 on:
   push:
     branches: [o31-xiaomi-tv-demo]
@@ -6,8 +6,8 @@ on:
 permissions:
   contents: write
 jobs:
-  android-apk:
-    runs-on: ubuntu-latest
+  premium-apk:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -20,20 +20,62 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Install Android SDK packages
+      - name: Install Android platform
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - name: Build test APK
+      - name: Download original video and property photos
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p o31tv/app/src/main/assets/media
+          cd o31tv/app/src/main/assets/media
+          base="https://o31languedoc.com/wp-content/uploads/2026/11"
+          curl --fail --location --retry 3 --connect-timeout 20 "$base/toulouse-film.mp4" -o toulouse-film.mp4
+          for name in salon-960 toulouse-960 cuisine-480 chambre-480 repas-480; do
+            curl --fail --location --retry 3 "$base/$name.webp" -o "$name.webp"
+          done
+          curl --fail --location --retry 3 "$base/o31-logo-croix-occitane.webp" -o logo.webp
+          cp salon-960.webp salon.webp
+          cp toulouse-960.webp toulouse.webp
+          cp cuisine-480.webp cuisine.webp
+          cp chambre-480.webp chambre.webp
+          cp repas-480.webp repas.webp
+          test "$(stat -c%s toulouse-film.mp4)" -gt 3000000
+          echo "Original movie size: $(stat -c%s toulouse-film.mp4) bytes"
+          python3 -m pip install --quiet qrcode[pil]
+          python3 - <<'PY'
+          import qrcode,urllib.parse
+          p={'carmes':'Place des Carmes, 31000 Toulouse, France','capitole':'Place du Capitole, 31000 Toulouse, France','jardin':'Allées Jules Guesde, 31400 Toulouse, France','sernin':'Place Saint-Sernin, 31000 Toulouse, France','jacobins':'Place des Jacobins, 31000 Toulouse, France','pont':'Quai de la Daurade, 31000 Toulouse, France','espace':'Avenue Jean Gonord, 31500 Toulouse, France'}
+          for name,addr in p.items():
+              u='https://www.google.com/maps/search/?api=1&query='+urllib.parse.quote(addr)
+              qrcode.make(u).save('qr-'+name+'.png')
+          PY
+      - name: Validate JavaScript
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re,pathlib
+          s=pathlib.Path('o31tv/app/src/main/assets/index.html').read_text()
+          p=re.search(r'<script>(.*)</script>',s,re.S)
+          pathlib.Path('/tmp/o31script.js').write_text(p.group(1))
+          PY
+          node --check /tmp/o31script.js
+      - name: Build Android TV APK
         run: gradle -p o31tv --no-daemon --stacktrace :app:assembleDebug
-      - name: Publish APK as workflow artifact
+      - name: Verify APK contains original film
+        run: |
+          unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/toulouse-film.mp4'
+          unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/logo.webp'
+      - name: Upload built APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: O31-Languedoc-TV-Test-APK
+          name: O31-Premium-AndroidTV-APK
           path: o31tv/app/build/outputs/apk/debug/app-debug.apk
-      - name: Publish public release for Downloader
+      - name: Publish installation APK for Downloader
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp o31tv/app/build/outputs/apk/debug/app-debug.apk O31-Languedoc-TV-Test.apk
-          gh release create o31-tv-test-1.0 O31-Languedoc-TV-Test.apk --title "O31 Languedoc TV • essai Xiaomi" --notes "Test Android TV non définitif. Ne remplace pas le launcher de Xiaomi." --target "$GITHUB_SHA" || gh release upload o31-tv-test-1.0 O31-Languedoc-TV-Test.apk --clobber
+          cp o31tv/app/build/outputs/apk/debug/app-debug.apk O31-TV.apk
+          gh release create tv2 O31-TV.apk --title "O31 Languedoc TV 2.0 Premium" --notes "Original Toulouse film and property photos are embedded. Dynamic access to installed apps. Does not replace Android TV Home." --target "$GITHUB_SHA" --latest || gh release upload tv2 O31-TV.apk --clobber
