@@ -95,7 +95,7 @@ function showAgenda(){
  var cached=getCachedAgenda();agendaData=agendaData||cached?.data||null;
  function render(){if(!$('#panel').classList.contains('open')||$('#heading').textContent!==t('extras'))return;
   grid.replaceChildren();var rows=agendaData?agendaEvents(agendaData):[];
-  var stamp=cached?.at||'';if(rows.length){rows.forEach(function(e){var date=new Date(e.date.slice(0,10));grid.appendChild(makeButton(e.name,date.toLocaleDateString(activeLanguage)+' · '+e.where,'function'===typeof Tv?.openAgenda?function(){Tv.openAgenda()}:function(){try{Tv.openOfficialAgenda()}catch(er){}}))})}
+  var stamp=cached?.at||'';if(rows.length){rows.forEach(function(e){var date=new Date(e.date.slice(0,10));grid.appendChild(makeButton(e.name,date.toLocaleDateString(activeLanguage)+' · '+e.where,function(){try{Tv.openOfficialAgenda()}catch(er){}}))})}
   else{var p=make('div','',t('agendaOffline'));p.style.cssText='padding:1.7vw;color:#e0e7ed;grid-column:span 4';grid.appendChild(p)}
   var go=makeButton(t('open'),stamp?t('update')+' : '+new Date(stamp).toLocaleDateString(activeLanguage):'Toulouse Métropole',function(){try{Tv.openOfficialAgenda()}catch(e){}});grid.appendChild(go);
  }
