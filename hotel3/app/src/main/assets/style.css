@@ -17,3 +17,25 @@
 .modal{position:fixed;inset:0;background:#010812c9;z-index:100;display:grid;place-items:center}.modal-box{width:75vw;max-height:85vh;overflow:auto;border:1px solid #f0ce89;background:linear-gradient(135deg,#173049,#091b2e);padding:2.1vw 2.5vw;border-radius:22px;box-shadow:0 30px 100px #000f}.modal-head{display:flex;align-items:center;justify-content:space-between;gap:1vw}.modal-head h2{font-size:2.6vw}.modal-content{font-size:1.13vw;line-height:1.52;margin-top:2vh}.modal-content p{line-height:1.54;color:#d8e0e3}.modal-content .line{border-top:1px solid #ffffff27;padding:1vw 0;display:flex;align-items:flex-start;gap:1.2vw}.num{background:#e3bd7d;color:#162639;border-radius:50%;min-width:2.6vw;height:2.6vw;display:grid;place-items:center;font-weight:700}.modalpic{float:right;max-height:25vh;max-width:35%;object-fit:cover;border-radius:10px;margin:0 0 1vw 1vw}.guideanim{width:13vw;min-width:130px;height:13vw;min-height:130px;margin:1vw 0;border:1px solid #dabc8580;background:#1f354b;border-radius:17px;display:grid;place-items:center;font-size:5vw}.pulse{animation:pulse 1.3s ease-in-out infinite}@keyframes pulse{0%,100%{text-shadow:0 0 0 #f5ca7c;transform:scale(.98)}50%{text-shadow:0 0 22px #ffd38e;transform:scale(1.1)}}.modal-buttons{display:flex;gap:1vw;margin:2vh 0}.modal-buttons .action{border-radius:12px}.qrbox{background:white;padding:9px;max-width:12vw;border-radius:9px}.pinrow{display:flex;gap:.7vw;align-items:center;flex-wrap:wrap}.pinbtn{width:4.2vw;height:4.2vw;display:grid;place-items:center;background:#203a51;border:1px solid #c6a779;border-radius:12px;font-size:1.6vw}.pinreadout{font:normal 2.3vw Georgia,serif;letter-spacing:.5em;color:#f6dcaf}.warn{border-left:3px solid #e4be75;padding:1vw;background:#ffffff10;color:#f0dcba}
 .saver{position:fixed;inset:0;z-index:300;background:#071626}.saver>img{width:100%;height:100%;object-fit:cover}.saver-shadow{position:absolute;inset:0;background:linear-gradient(0deg,#071527dd,transparent 70%),linear-gradient(90deg,#07152788,transparent)}.saver-content{position:absolute;left:5vw;bottom:8vh}.saver-content>img{width:5vw;height:5vw;object-fit:contain}.saver-content h2{font:normal 4.2vw Georgia,serif}.saver-content p{font-size:1.4vw}.saver-hint{position:absolute;right:4vw;bottom:4vh;font-size:1vw;color:#eee}
 @media(max-height:680px){#app{padding-top:1.3vh}.bar{height:9vh}.welcome{height:46%}.menu{height:44%}.tile-title{font-size:1.28vw}.tile-note{font-size:.7vw}.welcome h1{font-size:4vw}.home-caption{height:3%}}
+
+
+/* Ô31 V4 — version télévision : cartes plus petites et plus basses,
+   espace vidéo plus généreux, textes équilibrés FR/EN/ES. */
+#home .welcome{height:65%;max-height:none;padding:0 1vw;justify-content:center}
+#home .welcome h1{font-size:clamp(38px,3.75vw,76px);line-height:1.07;max-width:69vw}
+#home .welcome .subtitle{font-size:1.35vw}
+#home .menu{height:25%;min-height:0;gap:.9vw;padding:0 .8vw}
+#home .menu-tile{border-radius:14px}
+#home .menu-tile img{object-position:center 40%}
+#home .menu-tile .tile-mask{background:linear-gradient(0deg,rgba(5,15,27,.96),rgba(5,15,27,.83) 20%,rgba(5,15,27,.15) 63%,transparent)}
+#home .menu-text{left:.85vw;right:.65vw;bottom:.65vw}
+#home .tile-title{font-size:clamp(14px,1.17vw,24px);line-height:1.14}
+#home .tile-note{font-size:clamp(10px,.69vw,15px);margin-top:.42vh}
+#home .home-caption{height:4%;font-size:.68vw}
+@media(max-height:680px){
+ #home .welcome{height:65%}
+ #home .menu{height:25%}
+ #home .welcome h1{font-size:3.75vw}
+ #home .tile-title{font-size:1.15vw}
+ #home .tile-note{font-size:.72vw}
+}
