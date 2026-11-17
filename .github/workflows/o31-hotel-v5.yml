@@ -104,30 +104,13 @@ jobs:
               v=max(-1,min(1,s*breath*max(0,fade)))
               w.writeframesraw(struct.pack('<h',int(v*22000)))
           PY
-      - name: Obtain and trim user-specified hyperlapse with original credit retained in app
-        shell: bash
-        timeout-minutes: 12
-        run: |
-          set -euo pipefail
-          python3 -m pip install -q "yt-dlp[default]" imageio-ffmpeg
-          mkdir -p /tmp/o31-clip
-          yt-dlp --js-runtimes node --no-playlist --socket-timeout 35 --retries 3 -f "bestvideo[height<=1080]/best[height<=1080]/best" -o '/tmp/o31-clip/source.%(ext)s' 'https://www.youtube.com/watch?v=TBCqQmnsNFY'
-          src=$(find /tmp/o31-clip -maxdepth 1 -type f -name 'source.*' | head -n 1)
-          test -s "$src"
-          ff=$(python3 -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')
-          "$ff" -hide_banner -loglevel error -y -i "$src" -t 73.45 -an \
-            -vf 'scale=1280:-2:flags=bilinear,format=yuv420p' \
-            -c:v libx264 -threads 2 -preset veryfast -crf 28 -maxrate 2400k -bufsize 4800k -movflags +faststart \
-            hotel3/app/src/main/assets/media/toulouse-hyperlapse-v5.mp4
-          test "$(stat -c%s hotel3/app/src/main/assets/media/toulouse-hyperlapse-v5.mp4)" -gt 1000000
-          actual=$("$ff" -hide_banner -i hotel3/app/src/main/assets/media/toulouse-hyperlapse-v5.mp4 2>&1 | grep Duration | head -1)
-          echo "V5 trimmed movie: $actual; author credited on home UI"
       - name: Validate source and real media
         shell: bash
         run: |
           set -e
           node --check hotel3/app/src/main/assets/app.js
           grep -q 'TBCqQmnsNFY' hotel3/app/src/main/assets/app.js
+          grep -q 'end=73' hotel3/app/src/main/assets/app.js
           grep -q 'OpenAgenda via Opendatasoft' hotel3/app/src/main/java/com/o31languedoc/hotel/MainActivity.java
           grep -q 'appassets.androidplatform.net' hotel3/app/src/main/java/com/o31languedoc/hotel/MainActivity.java
           python3 - <<'PY'
@@ -137,7 +120,6 @@ jobs:
           assert 'O31_onRemote' in js and 'pinSubmit' in js and 'showSaver' in js
           assert (root/'media/toulouse-film.mp4').stat().st_size>3000000
           assert len(list((root/'media').glob('card-*.webp')))==5
-          assert (root/'media/toulouse-hyperlapse-v5.mp4').stat().st_size>1000000
           assert len(list((root/'media').glob('qr-*.png')))==7
           assert 'erMJTXF7+yph@XEX' not in js
           print('PASS: 5 themed cards, 7 route QR, offline video, no public Wi-Fi password')
@@ -148,7 +130,6 @@ jobs:
         run: |
           apk=hotel3/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$apk" | grep 'assets/media/toulouse-film.mp4'
-          unzip -l "$apk" | grep 'assets/media/toulouse-hyperlapse-v5.mp4'
           unzip -l "$apk" | grep 'assets/media/ambient.wav'
           unzip -l "$apk" | grep 'assets/media/card-agenda.webp'
           unzip -l "$apk" | grep 'assets/app.js'
@@ -164,7 +145,7 @@ jobs:
         shell: bash
         run: |
           cp hotel3/app/build/outputs/apk/debug/app-debug.apk O31-Hotel-TV-V5.apk
-          gh release create o31-hotel-tv-v5 O31-Hotel-TV-V5.apk --title "Ô31 Languedoc TV · Hôtel V5" --notes "V5 Android TV: local 73s trimmed Toulouse hyperlapse, original creator attribution in app, multi-event OpenAgenda and premium curated TV apps, 5 themed art cards, apps carousel, 6-digit administrator PIN, weather, Toulouse agenda, animated guides, 3 languages, offline content." --target "$GITHUB_SHA" || gh release upload o31-hotel-tv-v5 O31-Hotel-TV-V5.apk --clobber
+          gh release create o31-hotel-tv-v5 O31-Hotel-TV-V5.apk --title "Ô31 Languedoc TV · Hôtel V5" --notes "V5 Android TV: official YouTube embed limited to 73s, author attribution preserved, multi-event OpenAgenda and premium curated TV apps, 5 themed art cards, apps carousel, 6-digit administrator PIN, weather, Toulouse agenda, animated guides, 3 languages, offline content." --target "$GITHUB_SHA" || gh release upload o31-hotel-tv-v5 O31-Hotel-TV-V5.apk --clobber
       - name: Generate short Downloader address
         if: success()
         shell: bash
