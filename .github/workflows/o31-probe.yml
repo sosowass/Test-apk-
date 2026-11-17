@@ -1,0 +1,18 @@
+name: Probe O31 video hosting
+on:
+  push:
+    branches: [o31-xiaomi-tv-demo]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect public video endpoints
+        shell: bash
+        run: |
+          for base in "https://o31languedoc.com" "https://www.o31languedoc.com" "https://o31-languedoc.vercel.app" "https://o31languedoc.vercel.app"; do
+            for path in "/" "/assets/o31/toulouse-film.mp4"; do
+              printf '%s%s\n' "$base" "$path"
+              curl -L -A 'Mozilla/5.0' --max-time 15 -o /dev/null -s -w 'status=%{http_code} size=%{size_download} redirect=%{url_effective}\n' "$base$path" || echo 'network error'
+            done
+          done
