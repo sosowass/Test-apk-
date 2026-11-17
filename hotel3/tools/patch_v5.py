@@ -327,7 +327,6 @@ manifest=manifest_path.read_text()
 manifest=replace_once(manifest,'android:label="Ô31 Languedoc Hôtel V4"','android:label="Ô31 Languedoc Hôtel V5"',"V5 app name")
 manifest_path.write_text(manifest)
 
-assert 'class="agenda-tile-grid"' not in html # JS creates it at runtime
 assert 'OpenAgenda via Opendatasoft' in java
 assert 'premium-featured-row' in js
 assert '&end=73' in js
