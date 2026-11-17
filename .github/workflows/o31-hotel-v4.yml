@@ -1,0 +1,152 @@
+name: O31 Hotel Premium TV V4 YouTube
+on:
+  push:
+    branches: [o31-hotel-v4]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply V4 official YouTube player patch
+        run: python3 hotel3/tools/patch_v4.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Download authenticated property visuals and build themed images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hotel3/app/src/main/assets/media
+          cd hotel3/app/src/main/assets/media
+          base="https://o31languedoc.com/wp-content/uploads/2026/11"
+          curl --fail --location --retry 3 "$base/toulouse-film.mp4" -o toulouse-film.mp4
+          curl --fail --location --retry 3 "$base/o31-logo-croix-occitane.webp" -o logo.webp
+          for src in toulouse-960 salon-960 cuisine-480 chambre-960 repas-480 terrasse-960 jardin-480 salle-de-bain-480 entree-480; do
+            curl --fail --location --retry 3 "$base/$src.webp" -o "$src.webp"
+          done
+          cp toulouse-960.webp toulouse.webp
+          cp salon-960.webp salon.webp
+          cp cuisine-480.webp cuisine.webp
+          cp chambre-960.webp chambre.webp
+          cp repas-480.webp repas.webp
+          cp terrasse-960.webp terrasse.webp
+          cp jardin-480.webp jardin.webp
+          cp salle-de-bain-480.webp salle-de-bain.webp
+          cp entree-480.webp entree.webp
+          test "$(stat -c %s toulouse-film.mp4)" -gt 3000000
+          python3 -m pip install -q qrcode[pil]
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+          import qrcode,urllib.parse
+          coords = {'capitole':'Place du Capitole, 31000 Toulouse, France','sernin':'Place Saint-Sernin, 31000 Toulouse, France','jacobins':'Place des Jacobins, 31000 Toulouse, France','carmes':'Place des Carmes, 31000 Toulouse, France','jardin':'Allées Jules Guesde, 31400 Toulouse, France','espace':'Avenue Jean Gonord, 31500 Toulouse, France','pont':'Quai de la Daurade, 31000 Toulouse, France'}
+          for name,place in coords.items():
+            uri='https://www.google.com/maps/search/?api=1&query='+urllib.parse.quote(place)
+            qrcode.make(uri,box_size=8,border=3).save('qr-'+name+'.png')
+          # Five original compositions, each thematically distinct and generated from authentic property images
+          srcs=[('apps','salon'),('city','toulouse'),('guides','cuisine'),('stay','chambre'),('agenda','repas')]
+          for num,(name,src) in enumerate(srcs):
+            img=Image.open(src+'.webp').convert('RGB')
+            W,H=640,510;scale=max(W/img.width,H/img.height)
+            img=img.resize((int(img.width*scale)+1,int(img.height*scale)+1),Image.Resampling.LANCZOS)
+            left=(img.width-W)//2;top=(img.height-H)//2
+            img=img.crop((left,top,left+W,top+H))
+            img=ImageEnhance.Contrast(ImageEnhance.Color(img).enhance(.82)).enhance(1.1)
+            base=Image.new('RGBA',(W,H));base.alpha_composite(img.convert('RGBA'))
+            tint=Image.new('RGBA',(W,H),(8,22,38,35));base.alpha_composite(tint)
+            art=Image.new('RGBA',(W,H),(0,0,0,0));d=ImageDraw.Draw(art)
+            # Restrained golden thematic line-art in the upper-right corner
+            x=475;y=82;g=(244,206,146,215)
+            d.rounded_rectangle((x-68,y-58,x+72,y+75),radius=23,outline=g,width=5)
+            if name=='apps':
+              d.rectangle((x-35,y-25,x+37,y+20),outline=g,width=5);d.line((x,y+20,x,y+35),fill=g,width=5);d.line((x-18,y+35,x+18,y+35),fill=g,width=5)
+            elif name=='city':
+              d.line((x-35,y+31,x-35,y-3,x,y-30,x+38,y-3,x+38,y+31),fill=g,width=5);d.ellipse((x-9,y-16,x+9,y+2),outline=g,width=4)
+            elif name=='guides':
+              d.ellipse((x-34,y-32,x+34,y+36),outline=g,width=6);d.ellipse((x-10,y-8,x+10,y+12),outline=g,width=5);d.line((x,y-48,x,y-32),fill=g,width=5)
+            elif name=='stay':
+              d.rectangle((x-36,y-5,x+34,y+33),outline=g,width=5);d.line((x-36,y+33,x-36,y+49),fill=g,width=5);d.line((x+34,y+33,x+34,y+49),fill=g,width=5)
+            else:
+              d.rounded_rectangle((x-35,y-29,x+35,y+40),radius=7,outline=g,width=5);d.line((x-35,y-8,x+35,y-8),fill=g,width=5);d.ellipse((x-6,y+5,x+8,y+19),fill=g)
+            art=art.filter(ImageFilter.GaussianBlur(.25));base.alpha_composite(art)
+            base.convert('RGB').save('card-'+name+'.webp','WEBP',quality=89,method=6)
+          PY
+      - name: Create original royalty-free ambient pad
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import math, wave, struct
+          rate=16000;duration=24;path='hotel3/app/src/main/assets/media/ambient.wav'
+          with wave.open(path,'wb') as w:
+            w.setnchannels(1);w.setsampwidth(2);w.setframerate(rate)
+            notes=[(130.81,0.22),(196.00,0.11),(261.63,0.08),(329.63,0.06),(392.00,0.04)]
+            for j in range(duration*rate):
+              t=j/rate
+              breath=.65+.35*math.sin(2*math.pi*t/24)**2
+              fade=min(1,t/1.8,(duration-t)/1.8)
+              s=sum(amp*math.sin(2*math.pi*f*t+0.25*math.sin(t*.09+i)) for i,(f,amp) in enumerate(notes))
+              s+=.018*math.sin(2*math.pi*523.25*t)*math.exp(-((t%8)-1.5)**2/1.4)
+              v=max(-1,min(1,s*breath*max(0,fade)))
+              w.writeframesraw(struct.pack('<h',int(v*22000)))
+          PY
+      - name: Validate source and real media
+        shell: bash
+        run: |
+          set -e
+          node --check hotel3/app/src/main/assets/app.js
+          grep -q 'TBCqQmnsNFY' hotel3/app/src/main/assets/app.js
+          grep -q 'appassets.androidplatform.net' hotel3/app/src/main/java/com/o31languedoc/hotel/MainActivity.java
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('hotel3/app/src/main/assets')
+          js=(root/'app.js').read_text()
+          assert 'O31_onRemote' in js and 'pinSubmit' in js and 'showSaver' in js
+          assert (root/'media/toulouse-film.mp4').stat().st_size>3000000
+          assert len(list((root/'media').glob('card-*.webp')))==5
+          assert len(list((root/'media').glob('qr-*.png')))==7
+          assert 'erMJTXF7+yph@XEX' not in js
+          print('PASS: 5 themed cards, 7 route QR, offline video, no public Wi-Fi password')
+          PY
+      - name: Build APK
+        run: gradle -p hotel3 --no-daemon --stacktrace :app:assembleDebug
+      - name: Validate APK packaged assets
+        run: |
+          apk=hotel3/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$apk" | grep 'assets/media/toulouse-film.mp4'
+          unzip -l "$apk" | grep 'assets/media/ambient.wav'
+          unzip -l "$apk" | grep 'assets/media/card-agenda.webp'
+          unzip -l "$apk" | grep 'assets/app.js'
+          unzip -l "$apk" | grep 'assets/index.html'
+          ls -lh "$apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-Hotel-TV-V4-APK
+          path: hotel3/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish direct Downloader link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          cp hotel3/app/build/outputs/apk/debug/app-debug.apk O31-Hotel-TV-V4.apk
+          gh release create o31-hotel-tv-v4 O31-Hotel-TV-V4.apk --title "Ô31 Languedoc TV · Hôtel V4" --notes "V4 Android TV: official YouTube video player (original creator attribution preserved), authentic offline Toulouse film, 5 themed art cards, apps carousel, 6-digit administrator PIN, weather, Toulouse agenda, animated guides, 3 languages, offline content." --target "$GITHUB_SHA" || gh release upload o31-hotel-tv-v4 O31-Hotel-TV-V4.apk --clobber
+      - name: Generate short Downloader address
+        if: success()
+        shell: bash
+        run: |
+          target="https://github.com/sosowass/Test-apk-/releases/download/o31-hotel-tv-v4/O31-Hotel-TV-V4.apk"
+          short=$(curl -fsSL --max-time 20 -G --data-urlencode "format=simple" --data-urlencode "shorturl=hotel31v4" --data-urlencode "url=$target" https://is.gd/create.php || true)
+          echo "DOWNLOADER_SHORT_URL=$short"
+          [[ "$short" == https://is.gd/* ]] && curl -sSIL --max-time 20 -o /dev/null -w 'FINAL_STATUS=%{http_code}\n' "$short" || true
