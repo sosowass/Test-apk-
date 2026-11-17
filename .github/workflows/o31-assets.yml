@@ -1,0 +1,23 @@
+name: Inspect O31 assets
+on:
+  push:
+    branches: [o31-xiaomi-tv-demo]
+  workflow_dispatch:
+jobs:
+  media:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discover authentic public photos and video
+        run: |
+          python3 - <<'PY'
+          import urllib.request,re,html
+          req=urllib.request.Request('https://o31languedoc.com/',headers={'User-Agent':'Mozilla/5.0'})
+          t=urllib.request.urlopen(req,timeout=30).read().decode('utf8','replace')
+          urls=set(html.unescape(x) for x in re.findall(r'https://o31languedoc\.com/wp-content/uploads/[^"\' <>]+',t))
+          for x in sorted(urls):
+            if re.search(r'\.(webp|jpg|jpeg|png|mp4)',x,re.I):
+              print(x[:180])
+          print('TOTAL',len(urls))
+          PY
+          echo "VERIFY VIDEO"
+          curl -fLs --max-time 40 -o /tmp/o31-video.mp4 -w "HTTP %{http_code} | downloaded %{size_download} bytes\n" https://o31languedoc.com/wp-content/uploads/2026/11/toulouse-film.mp4
