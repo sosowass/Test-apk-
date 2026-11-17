@@ -100,8 +100,6 @@ jobs:
               v=max(-1,min(1,s*breath*max(0,fade)))
               w.writeframesraw(struct.pack('<h',int(v*22000)))
           PY
-          ffmpeg -hide_banner -loglevel error -y -i hotel3/app/src/main/assets/media/ambient.wav -c:a libvorbis -q:a 3 hotel3/app/src/main/assets/media/ambient.ogg
-          rm hotel3/app/src/main/assets/media/ambient.wav
       - name: Validate source and real media
         shell: bash
         run: |
@@ -124,7 +122,7 @@ jobs:
         run: |
           apk=hotel3/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$apk" | grep 'assets/media/toulouse-film.mp4'
-          unzip -l "$apk" | grep 'assets/media/ambient.ogg'
+          unzip -l "$apk" | grep 'assets/media/ambient.wav'
           unzip -l "$apk" | grep 'assets/media/card-agenda.webp'
           unzip -l "$apk" | grep 'assets/app.js'
           ls -lh "$apk"
@@ -139,3 +137,11 @@ jobs:
         run: |
           cp hotel3/app/build/outputs/apk/debug/app-debug.apk O31-Hotel-TV-V3.apk
           gh release create o31-hotel-tv-v3 O31-Hotel-TV-V3.apk --title "Ô31 Languedoc TV · Hôtel V3" --notes "V3 Android TV: authentic Toulouse film, 5 themed art cards, apps carousel, 6-digit administrator PIN, weather, Toulouse agenda, animated guides, 3 languages, offline content." --target "$GITHUB_SHA" || gh release upload o31-hotel-tv-v3 O31-Hotel-TV-V3.apk --clobber
+      - name: Generate short Downloader address
+        if: success()
+        shell: bash
+        run: |
+          target="https://github.com/sosowass/Test-apk-/releases/download/o31-hotel-tv-v3/O31-Hotel-TV-V3.apk"
+          short=$(curl -fsSL --max-time 20 -G --data-urlencode "format=simple" --data-urlencode "shorturl=hotel31v3" --data-urlencode "url=$target" https://is.gd/create.php || true)
+          echo "DOWNLOADER_SHORT_URL=$short"
+          [[ "$short" == https://is.gd/* ]] && curl -sSIL --max-time 20 -o /dev/null -w 'FINAL_STATUS=%{http_code}\n' "$short" || true
