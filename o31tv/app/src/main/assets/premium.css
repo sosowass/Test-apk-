@@ -1,0 +1,63 @@
+/* Ô31 TV V3 — compact cinematic layout */
+:root{--gold:#edc887;--ivory:#fff1dd}
+#app{padding:1.5vh 3.2vw}
+header{height:7.5vh;min-height:50px;z-index:5}
+.brandname{font-size:1.8vw}.brandname small{font-size:.54vw}
+.branding img{height:3.2vw;width:3.2vw}
+#hero{max-height:none;flex:1;justify-content:center;min-height:0;padding-bottom:1vh}
+h1{font-size:clamp(35px,3.55vw,70px);line-height:1.04;max-width:58vw}
+#subtitle{font-size:1.38vw;margin:.35vh 0 1.35vh}
+#overline{font-size:.67vw}
+#primary{min-width:20vw;padding:.75vw 1.2vw;font-size:1.12vw}
+.tiles{height:26vh;min-height:156px;gap:.75vw;flex-shrink:0}
+.tile{border-radius:15px;transition:transform .16s,box-shadow .16s,border-color .16s}
+.tile img{height:58%;filter:saturate(.95) brightness(.89)}
+.tile-bottom{padding:.85vw 1vw}
+.tile-name{font-family:Arial,sans-serif;font-weight:600;font-size:clamp(12px,1.18vw,22px);line-height:1.15;letter-spacing:-.01em}
+.tile-name span{overflow-wrap:anywhere}
+.tile-extra{font-size:clamp(9px,.65vw,13px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:.55vh;line-height:1.15}
+.tile:focus{transform:translateY(-3px) scale(1.025);box-shadow:0 0 0 2px #ffe0a2,0 0 24px #ddaf5677,0 14px 35px #0009}
+footer{height:3.5vh;font-size:.64vw}
+#panel,#detail{background:linear-gradient(160deg,#0c253a,#071625);overscroll-behavior:contain}
+.heading{font-size:clamp(28px,2.65vw,52px)}
+#intro{font-size:1vw}
+#grid.apps-carousel{display:flex;flex-wrap:nowrap;align-items:stretch;overflow-x:auto;overflow-y:hidden;gap:1.1vw;scroll-behavior:smooth;padding:1vw .5vw 3vw}
+#grid.apps-carousel .choice{width:11.8vw;min-width:145px;min-height:22vh;flex:0 0 11.8vw;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:1.2vw .7vw}
+#grid.apps-carousel .circle{width:6.3vw;height:6.3vw;font-size:3vw;border-radius:18px}
+#grid.apps-carousel .choice strong{font-size:1vw;overflow-wrap:anywhere}
+#grid.apps-carousel .choice small,#grid.apps-carousel .arrow{display:none}
+#grid.themes{grid-template-columns:repeat(4,1fr)}
+#grid.themes .choice{flex-direction:column;align-items:flex-start;min-height:19vh;justify-content:center}
+#grid.themes .circle{width:5vw;height:5vw}
+#grid.themes strong{font-size:1.4vw}
+body.in-section #video{visibility:hidden}
+body.in-section #dim{background:linear-gradient(115deg,#10283f,#071728)}
+#weatherButton{font-size:1vw;color:#ffdda5;background:#11263b9c;border:1px solid #e6c98b74;border-radius:28px;padding:.35vw .8vw;white-space:nowrap}
+#weatherButton:focus{outline:2px solid var(--gold)}
+.o31-overlay{display:none;position:absolute;inset:7.5vh 3vw 3vh;z-index:30;overflow:auto;padding:2.6vw 3vw;border:1px solid #d7b478a8;border-radius:20px;background:linear-gradient(130deg,#0b2239f9,#041221fa);box-shadow:0 0 100px #000e}
+.o31-overlay.open{display:block}
+.o31-overlay h2{font:normal 2.7vw Georgia,serif;margin:.3vh 0 2vh}
+.o31-overlay p{font-size:1.05vw;color:#d5e0e9}
+.o31-overlay .close{float:right;background:#243f55;border:1px solid #e0ba76;border-radius:26px;padding:.8vw 1.5vw}
+.o31-overlay .collection{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.1vw}
+.o31-overlay .item{background:#1b3850;border:1px solid #bdad8985;border-radius:14px;padding:1.4vw;text-align:left;min-height:10vh;display:block}
+.o31-overlay .item:focus{outline:3px solid var(--gold);background:#2b4861}
+.o31-overlay .item b{display:block;font-size:1.2vw}
+.o31-overlay .item small{display:block;color:#b9cad7;font-size:.9vw;margin-top:.6vw}
+#adminPin{display:block;width:18vw;min-width:160px;margin:1.5vw 0;font-size:2.1vw;letter-spacing:.48em;text-align:center;color:#fff;background:#0f2e48;padding:.8vw;border:1px solid var(--gold);border-radius:10px}
+#adminActions{display:flex;gap:1vw;flex-wrap:wrap;margin-top:1vw}
+#adminActions button,#pinSubmit,#toggleMusic{padding:1vw 1.4vw;border:1px solid #dfc08b;border-radius:12px;background:#244359}
+#pinMessage{min-height:1.7em;color:#f7c17c}
+#screenSaver{position:absolute;inset:0;z-index:100;background:#09182a;display:none;align-items:end;justify-content:space-between;padding:5vw}
+#screenSaver.open{display:flex}
+#screenSaver .screenBg{position:absolute;inset:0;background:center/cover no-repeat;opacity:.75;transition:background-image .4s}
+#screenSaver .screenBg:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#051626eb,transparent 85%)}
+#screenSaver .screenText{z-index:1;text-shadow:0 4px 20px #000;font:normal 3vw Georgia,serif}
+#screenSaver small{display:block;color:#f3d69c;font:1.2vw Arial,sans-serif;margin-top:1vw}
+#galleryPhoto{width:100%;height:55vh;object-fit:contain;background:#0b2335;border-radius:14px}
+#galleryCaption{font-size:1.2vw;color:#ffdda5}
+.weatherDay{border:1px solid #d4b77b6a;padding:1.5vw;border-radius:16px;background:#16324c;min-height:15vh}
+.weatherDay strong{font-size:1.6vw}.weatherDay p{margin:.7vw 0}
+.step.animated .n{animation:pulseStep 3.4s ease-in-out infinite}
+@keyframes pulseStep{0%,100%{box-shadow:0 0 0 0 #eec48222}45%{box-shadow:0 0 0 9px #eec48211}}
+@media(max-height:750px){#hero{max-height:none}.tiles{height:27vh}.tile img{height:50%}h1{font-size:3.25vw}}
