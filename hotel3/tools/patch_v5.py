@@ -101,7 +101,7 @@ function appsPage(){
 """
 js=replace_section(js,"function appsPage(){","function cityPage(){",new_apps,"app catalog")
 new_agenda=r"""
-let agendaRange='month',agendaCategory='all',agendaPage=0,agendaPageSize=9;
+let agendaRange='month',agendaCategory='all',agendaIndex=0,agendaPageSize=9;
 function agendaPage(){
  const t={
  fr:{caption:'Agenda vivant de Toulouse · concerts, expositions, spectacles et sorties',all:'Tout',today:"Aujourd’hui",week:'7 jours',month:'30 jours',future:'À venir',music:'Musique',family:'Famille',shows:'Spectacles',art:'Culture',free:'Gratuit',count:'sorties trouvées',next:'Suivant',previous:'Précédent',source:'Source : OpenAgenda / OpenDataSoft',details:'Voir la fiche de l’événement',notFound:'Aucune sortie pour ce filtre. Choisissez une autre période.',newData:'Les événements s’actualisent automatiquement. Les organisateurs restent responsables de leurs annonces.',web:'Voir l’agenda officiel',noImage:'Événement à Toulouse'},
@@ -116,12 +116,12 @@ function agendaPage(){
  body.appendChild(lead);
  const ranges=document.createElement('div');ranges.className='agenda-filters';ranges.id='agendaRanges';
  for(const [key,name] of [['today',t.today],['week',t.week],['month',t.month],['all',t.future]]){
-  const b=button(clean(name),'premium-chip'+(agendaRange===key?' active':''),()=>{agendaRange=key;agendaPage=0;drawAgenda()});b.dataset.range=key;ranges.appendChild(b);
+  const b=button(clean(name),'premium-chip'+(agendaRange===key?' active':''),()=>{agendaRange=key;agendaIndex=0;drawAgenda()});b.dataset.range=key;ranges.appendChild(b);
  }
  body.appendChild(ranges);
  const kinds=document.createElement('div');kinds.className='agenda-filters categories';kinds.id='agendaCategories';
  for(const [key,name] of [['all',t.all],['music',t.music],['shows',t.shows],['family',t.family],['art',t.art],['free',t.free]]){
-  const b=button(clean(name),'premium-chip'+(agendaCategory===key?' active':''),()=>{agendaCategory=key;agendaPage=0;drawAgenda()});b.dataset.cat=key;kinds.appendChild(b);
+  const b=button(clean(name),'premium-chip'+(agendaCategory===key?' active':''),()=>{agendaCategory=key;agendaIndex=0;drawAgenda()});b.dataset.cat=key;kinds.appendChild(b);
  }
  body.appendChild(kinds);
  const status=document.createElement('p');status.id='agendaStatus';status.className='sectionnote';body.appendChild(status);
@@ -187,8 +187,8 @@ function drawAgenda(){
    const empty=document.createElement('div');empty.className='agenda-empty';empty.innerHTML='<div class="agenda-empty-icon">✧</div><p>'+clean(text.none)+'</p>';
    const a=button(clean(text.official),'action',()=>{if(window.O31)O31.openLink('https://metropole.toulouse.fr/agenda')});empty.appendChild(a);grid.appendChild(empty);return;
  }
- const count=Math.ceil(list.length/agendaPageSize);agendaPage=Math.max(0,Math.min(agendaPage,count-1));
- list.slice(agendaPage*agendaPageSize,(agendaPage+1)*agendaPageSize).forEach(e=>{
+ const count=Math.ceil(list.length/agendaPageSize);agendaIndex=Math.max(0,Math.min(agendaIndex,count-1));
+ list.slice(agendaIndex*agendaPageSize,(agendaIndex+1)*agendaPageSize).forEach(e=>{
   const b=document.createElement('button');b.className='agenda-event-card';
   const art=document.createElement('span');art.className='agenda-event-art';
   if(e.image){const im=new Image();im.alt='';im.loading='lazy';im.referrerPolicy='no-referrer';im.src=e.image;im.onerror=()=>{im.remove();art.classList.add('no-photo')};art.appendChild(im)}
@@ -213,9 +213,9 @@ function drawAgenda(){
   grid.appendChild(b);
  });
  if(count>1){
-  const prev=button('← '+text.prev,'action',()=>{agendaPage--;drawAgenda()});prev.disabled=agendaPage===0;
-  const counter=document.createElement('span');counter.className='agenda-page-index';counter.textContent=(agendaPage+1)+' / '+count;
-  const next=button(text.next+' →','action',()=>{agendaPage++;drawAgenda()});next.disabled=agendaPage===count-1;
+  const prev=button('← '+text.prev,'action',()=>{agendaIndex--;drawAgenda()});prev.disabled=agendaIndex===0;
+  const counter=document.createElement('span');counter.className='agenda-page-index';counter.textContent=(agendaIndex+1)+' / '+count;
+  const next=button(text.next+' →','action',()=>{agendaIndex++;drawAgenda()});next.disabled=agendaIndex===count-1;
   pager.append(prev,counter,next);
  }
 }
