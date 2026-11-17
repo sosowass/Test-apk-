@@ -102,10 +102,16 @@ java=must_replace(java,"document.getElementById('heroMovie')?.pause();document.g
 java_path.write_text(java)
 
 gradle=gradle_path.read_text()
+gradle=must_replace(gradle,"applicationId 'com.o31languedoc.hotel'","applicationId 'com.o31languedoc.hotel.v4'","V4 side-by-side installation ID")
 gradle=must_replace(gradle,'versionCode 3','versionCode 4','version code')
 gradle=must_replace(gradle,"versionName '3.0-hotel'","versionName '4.0-youtube'","version name")
 gradle+="\ndependencies { implementation 'androidx.webkit:webkit:1.11.0' }\n"
 gradle_path.write_text(gradle)
+manifest_path=base/"AndroidManifest.xml"
+manifest=manifest_path.read_text()
+manifest=must_replace(manifest,'android:label="Ô31 Languedoc Hôtel"','android:label="Ô31 Languedoc Hôtel V4"','V4 app label')
+manifest=must_replace(manifest,'android:name=".MainActivity"','android:name="com.o31languedoc.hotel.MainActivity"','V4 resolved activity')
+manifest_path.write_text(manifest)
 
 assert "TBCqQmnsNFY" in js and "youtubeEmbed" in html and "WebViewAssetLoader" in java
 print("V4 patch complete: official YouTube player + original credits, cards lower, offline film retained")
