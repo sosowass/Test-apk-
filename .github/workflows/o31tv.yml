@@ -1,7 +1,7 @@
 name: O31 Premium Xiaomi Android TV APK
 on:
   push:
-    branches: [o31-xiaomi-tv-demo]
+    branches: [o31-premium-v3]
   workflow_dispatch:
 permissions:
   contents: write
@@ -51,6 +51,74 @@ jobs:
               u='https://www.google.com/maps/search/?api=1&query='+urllib.parse.quote(addr)
               qrcode.make(u).save('qr-'+name+'.png')
           PY
+      - name: Generate five bespoke card illustrations and original ambient audio
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw, ImageOps, ImageEnhance
+          from pathlib import Path
+          import math, wave, struct
+          d=Path('o31tv/app/src/main/assets/media')
+          sources=[
+            ('apps','salon.webp'),('city','toulouse.webp'),
+            ('guides','cuisine.webp'),('stay','chambre.webp'),('extras','repas.webp')
+          ]
+          gold=(247,210,149,235)
+          for theme,source in sources:
+              photo=Image.open(d/source).convert('RGB')
+              image=ImageOps.fit(photo,(850,480),method=Image.Resampling.LANCZOS)
+              image=ImageEnhance.Contrast(image).enhance(1.08)
+              image=ImageEnhance.Color(image).enhance(.87)
+              overlay=Image.new('RGBA',image.size,(0,0,0,0))
+              draw=ImageDraw.Draw(overlay)
+              # Create a bespoke cinematic dark-to-clear gradient, not a placeholder.
+              for x in range(850):
+                  alpha=int(112*(x/850)**1.5)
+                  draw.line((x,0,x,480),fill=(8,26,43,alpha))
+              draw.rounded_rectangle((15,15,834,464),radius=28,outline=(248,210,151,135),width=2)
+              if theme=='apps':
+                  draw.rounded_rectangle((565,140,750,305),radius=22,outline=gold,width=9)
+                  draw.polygon([(635,179),(635,265),(702,223)],fill=gold)
+                  draw.line((657,308,657,334),fill=gold,width=8)
+                  draw.line((628,336,697,336),fill=gold,width=8)
+              elif theme=='city':
+                  draw.rectangle((584,193,735,330),outline=gold,width=7)
+                  draw.arc((618,133,694,211),180,360,fill=gold,width=7)
+                  draw.line((657,138,657,192),fill=gold,width=6)
+                  draw.arc((624,232,694,326),180,360,fill=gold,width=6)
+                  for cx in (602,713):draw.line((cx,224,cx,295),fill=gold,width=6)
+              elif theme=='guides':
+                  draw.rounded_rectangle((585,130,735,329),radius=15,outline=gold,width=8)
+                  draw.line((585,184,735,184),fill=gold,width=6)
+                  for cx in (613,655,697):draw.ellipse((cx-7,150,cx+7,164),outline=gold,width=4)
+                  draw.rounded_rectangle((608,210,713,302),radius=5,outline=gold,width=5)
+              elif theme=='stay':
+                  draw.ellipse((586,178,661,255),outline=gold,width=10)
+                  draw.line((657,246,737,331),fill=gold,width=13)
+                  draw.line((721,315,739,296),fill=gold,width=11)
+                  draw.line((702,299,720,280),fill=gold,width=11)
+              elif theme=='extras':
+                  draw.rounded_rectangle((577,151,737,332),radius=13,outline=gold,width=8)
+                  draw.line((577,198,737,198),fill=gold,width=8)
+                  for cx in (607,704):draw.line((cx,136,cx,169),fill=gold,width=9)
+                  draw.ellipse((624,221,693,286),outline=gold,width=5)
+                  draw.line((659,225,659,256),fill=gold,width=5)
+                  draw.line((659,256,682,265),fill=gold,width=5)
+              final=Image.alpha_composite(image.convert('RGBA'),overlay).convert('RGB')
+              final.save(d/('card-'+theme+'.webp'),'WEBP',quality=85,method=6)
+          # A simple original ambient pad: no commercial music or external audio assets.
+          rate=12000;duration=12
+          with wave.open(str(d/'ambience.wav'),'wb') as output:
+              output.setnchannels(1);output.setsampwidth(2);output.setframerate(rate)
+              frames=bytearray()
+              for i in range(rate*duration):
+                  t=i/rate
+                  envelope=.3+.7*(.5-.5*math.cos(2*math.pi*t/duration))
+                  val=envelope*(.35*math.sin(2*math.pi*196*t)+.26*math.sin(2*math.pi*245*t)+.20*math.sin(2*math.pi*294*t))
+                  frames+=struct.pack('<h',int(8500*val))
+              output.writeframes(frames)
+          print("Generated themed photos and original sound:",[(p.name,p.stat().st_size) for p in d.glob('card-*.webp')])
+          PY
       - name: Validate JavaScript
         shell: bash
         run: |
@@ -61,21 +129,25 @@ jobs:
           pathlib.Path('/tmp/o31script.js').write_text(p.group(1))
           PY
           node --check /tmp/o31script.js
+          node --check o31tv/app/src/main/assets/premium.js
       - name: Build Android TV APK
         run: gradle -p o31tv --no-daemon --stacktrace :app:assembleDebug
       - name: Verify APK contains original film
         run: |
           unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/toulouse-film.mp4'
           unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/logo.webp'
+          unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/card-apps.webp'
+          unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/media/ambience.wav'
+          unzip -l o31tv/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/premium.js'
       - name: Upload built APK
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: O31-Premium-AndroidTV-APK
+          name: O31-Premium-V3-AndroidTV-APK
           path: o31tv/app/build/outputs/apk/debug/app-debug.apk
       - name: Publish installation APK for Downloader
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp o31tv/app/build/outputs/apk/debug/app-debug.apk O31-TV.apk
-          gh release create tv2 O31-TV.apk --title "O31 Languedoc TV 2.0 Premium" --notes "Original Toulouse film and property photos are embedded. Dynamic access to installed apps. Does not replace Android TV Home." --target "$GITHUB_SHA" --latest || gh release upload tv2 O31-TV.apk --clobber
+          cp o31tv/app/build/outputs/apk/debug/app-debug.apk O31-TV-Premium-V3.apk
+          gh release create tv3 O31-TV-Premium-V3.apk --title "O31 Languedoc TV 3.0 Premium" --notes "Compact premium hotel design, thematic cards, film, installed apps, owner PIN, weather, Toulouse events, offline guides and apartment tour. HOME/kiosk compatibility must be tested on Xiaomi Android TV 11." --target "$GITHUB_SHA" --latest || gh release upload tv3 O31-TV-Premium-V3.apk --clobber
