@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+android {
+ namespace 'com.o31languedoc.hotel'
+ compileSdk 35
+ defaultConfig {
+  applicationId 'com.o31languedoc.hotel'
+  minSdk 23
+  targetSdk 32
+  versionCode 3
+  versionName '3.0-hotel'
+ }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

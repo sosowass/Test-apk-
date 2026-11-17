@@ -1,0 +1,21 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ô31 Languedoc — TV Hôtel</title><link rel="stylesheet" href="style.css"></head><body>
+<video id="heroMovie" autoplay muted loop playsinline preload="auto" poster="media/toulouse.webp"><source src="media/toulouse-film.mp4" type="video/mp4"></video>
+<div id="heroVeil"></div><div id="pageBackdrop"></div>
+<div id="app"><header class="bar">
+<div class="identity"><img src="media/logo.webp" alt=""><div><div class="brand">Ô31 LANGUEDOC</div><div class="brand-sub">VOTRE ADRESSE AUX CARMES</div></div></div>
+<div class="tools"><button class="weather-pill" id="weatherBtn" aria-label="Météo de Toulouse"><span id="weatherIcon">☀</span> <span id="weatherBrief">Météo</span> <span class="small-arrow">›</span></button><span id="time">--:--</span><span class="langbox"><button class="lang active" data-lang="fr">FR</button><button class="lang" data-lang="en">EN</button><button class="lang" data-lang="es">ES</button></span></div></header>
+<main id="home" class="page"><section class="welcome"><div class="eyebrow" id="welcomeTop">TOULOUSE · LES CARMES</div><h1 id="welcomeTitle">Bonsoir et bienvenue à<br><em>Ô31 Languedoc</em></h1><p class="subtitle" id="welcomeSub">La Ville Rose, à portée de télécommande.</p></section>
+<div class="menu" id="menu">
+<button class="menu-tile" data-open="apps"><img src="media/card-apps.webp" alt=""><span class="tile-mask"></span><span class="menu-text"><span class="tile-title" data-key="apps">Mes applications</span><span class="tile-note" data-note="apps">Toutes vos applications TV</span></span></button>
+<button class="menu-tile" data-open="city"><img src="media/card-city.webp" alt=""><span class="tile-mask"></span><span class="menu-text"><span class="tile-title" data-key="city">Visiter Toulouse</span><span class="tile-note" data-note="city">Parcours thématiques</span></span></button>
+<button class="menu-tile" data-open="guides"><img src="media/card-guides.webp" alt=""><span class="tile-mask"></span><span class="menu-text"><span class="tile-title" data-key="guides">Équipements</span><span class="tile-note" data-note="guides">Guides animés</span></span></button>
+<button class="menu-tile" data-open="stay"><img src="media/card-stay.webp" alt=""><span class="tile-mask"></span><span class="menu-text"><span class="tile-title" data-key="stay">Votre séjour</span><span class="tile-note" data-note="stay">Informations pratiques</span></span></button>
+<button class="menu-tile" data-open="agenda"><img src="media/card-agenda.webp" alt=""><span class="tile-mask"></span><span class="menu-text"><span class="tile-title" data-key="agenda">Agenda Toulouse</span><span class="tile-note" data-note="agenda">Sorties et événements</span></span></button>
+</div><div class="home-caption" id="homeCaption">Un séjour au cœur de Toulouse · 5 rue du Languedoc</div></main>
+<section id="section" class="page hidden" aria-hidden="true"><div class="section-head"><div><div class="eyebrow" id="sectionKicker">Ô31 LANGUEDOC · VOTRE CONCIERGERIE</div><h2 id="sectionTitle">Découvrir</h2><p id="sectionDesc"></p></div><button id="sectionBack" class="back">← <span data-t="back">Retour</span></button></div><div id="sectionBody" class="section-body"></div></section>
+<div class="footer"><div>Ô31 LANGUEDOC <span>·</span> TOULOUSE</div><div id="footTip">◀ ▶ NAVIGUER &nbsp; · &nbsp; OK SÉLECTIONNER &nbsp; · &nbsp; ↩ RETOUR</div></div>
+</div>
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle"></h2><button id="modalBack" class="back">✕ <span data-t="close">Fermer</span></button></div><div id="modalContent" class="modal-content"></div></div></div>
+<div id="screenSaver" class="saver hidden"><img id="saverImg" src="media/toulouse.webp"><div class="saver-shadow"></div><div class="saver-content"><img src="media/logo.webp" alt=""><h2>Ô31 LANGUEDOC</h2><p id="saverClock"></p><p id="saverForecast"></p></div><div class="saver-hint">Appuyez sur une touche pour revenir</div></div>
+<audio id="ambientAudio" src="media/ambient.ogg" loop preload="auto"></audio>
+<script src="app.js"></script></body></html>
