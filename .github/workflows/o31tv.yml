@@ -1,0 +1,33 @@
+name: Build O31 Xiaomi TV test APK
+on:
+  push:
+    branches: [o31-xiaomi-tv-demo]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build test APK
+        run: gradle -p o31tv --no-daemon --stacktrace :app:assembleDebug
+      - name: Publish APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: O31-Languedoc-TV-Test-APK
+          path: o31tv/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish public release for Downloader
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp o31tv/app/build/outputs/apk/debug/app-debug.apk O31-Languedoc-TV-Test.apk
+          gh release create o31-tv-test-1.0 O31-Languedoc-TV-Test.apk --title "O31 Languedoc TV • essai Xiaomi" --notes "Test Android TV non définitif. Ne remplace pas le launcher de Xiaomi." --target "$GITHUB_SHA" || gh release upload o31-tv-test-1.0 O31-Languedoc-TV-Test.apk --clobber
