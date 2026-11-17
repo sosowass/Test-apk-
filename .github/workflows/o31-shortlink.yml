@@ -1,0 +1,19 @@
+name: Short address for O31 TV Downloader
+on:
+  push:
+    branches: [o31-xiaomi-tv-demo]
+  workflow_dispatch:
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create and validate shortlink
+        shell: bash
+        run: |
+          set -e
+          dest="https://github.com/sosowass/Test-apk-/releases/download/tv2/O31-TV.apk"
+          result=$(curl -fLsSG --max-time 15 --data-urlencode "format=simple" --data-urlencode "shorturl=O31LTV26" --data-urlencode "url=$dest" "https://is.gd/create.php" || true)
+          echo "SHORT_LINK=$result"
+          if [[ "$result" == https://is.gd/* ]]; then
+             curl -sSIL --max-time 30 -o /dev/null -w 'REDIRECT_HTTP=%{http_code} FINAL=%{url_effective}\n' "$result" || true
+          fi
