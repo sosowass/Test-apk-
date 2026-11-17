@@ -1,0 +1,17 @@
+name: Discover public O31 video asset
+on:
+  push:
+    branches: [o31-xiaomi-tv-demo]
+  workflow_dispatch:
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: inspect public site video tags
+        run: |
+          curl -L -sS --max-time 25 -A 'Mozilla/5.0' https://o31languedoc.com/ -o /tmp/site.html
+          echo "page bytes=$(wc -c </tmp/site.html)"
+          grep -oE '.{0,110}([.]mp4|[.]webm|<video|video/).{0,120}' /tmp/site.html | head -24 || true
+          grep -oE 'https?[^" <]{0,100}\.mp4[^" <]{0,90}' /tmp/site.html | head -10 || true
+          echo "head excerpt"
+          head -c 800 /tmp/site.html | tr -d '\\n' 
