@@ -137,17 +137,17 @@ function agendaEntries(){
  const rows=(agenda&&Array.isArray(agenda.results))?agenda.results:[];
  const uniq=new Set(),now=Date.now();
  return rows.map(r=>{
-  const title=String(eventField(r,['title','nom_de_la_manifestation','nom','titre'])||'Sortie à Toulouse');
-  const start=parseDate(eventField(r,['firstdate_begin','date_debut','start_date']));
-  const end=parseDate(eventField(r,['lastdate_end','date_fin','end_date']))||start;
+  const title=String(eventField(r,['title_fr','title','nom_de_la_manifestation','nom','titre'])||'Sortie à Toulouse');
+  const start=parseDate(eventField(r,['display_start','firstdate_begin','date_debut','start_date']));
+  const end=parseDate(eventField(r,['display_end','lastdate_end','date_fin','end_date']))||start;
   const city=String(eventField(r,['location_city','commune'])||'Toulouse');
   const place=String(eventField(r,['location_name','lieu_nom','lieu'])||'Toulouse');
   const address=String(eventField(r,['location_address','lieu_adresse_1','adresse'])||place);
   const image=safeImage(eventField(r,['image','thumbnail','image_source']));
   const url=String(eventField(r,['canonicalurl','reservation_site_internet'])||'https://metropole.toulouse.fr/agenda');
-  const desc=String(eventField(r,['description','descriptif_court'])||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
-  const category=(title+' '+desc+' '+eventField(r,['keywords','agenda_title'])).toLowerCase();
-  const free=/gratuit|entrée libre|free|gratis/i.test(String(eventField(r,['conditions','description','keywords']))+' '+title);
+  const desc=String(eventField(r,['description_fr','description','descriptif_court'])||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  const category=(title+' '+desc+' '+eventField(r,['keywords_fr','keywords','originagenda_title','agenda_title'])).toLowerCase();
+  const free=/gratuit|entrée libre|free|gratis/i.test(String(eventField(r,['conditions_fr','description_fr','keywords_fr','conditions','description','keywords']))+' '+title);
   const id=String(eventField(r,['uid','id','identifiant'])||title+':'+(start?start.toISOString():''));
   return {r,title,start,end,city,place,address,image,url,desc,category,free,id};
  }).filter(e=>{
@@ -288,17 +288,45 @@ new_native=r"""  @JavascriptInterface public void fetch(String type){
           JSONArray events=new JSONArray();
           String now=new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.FRANCE).format(new java.util.Date());
           String where="location_city = \"Toulouse\" AND lastdate_end >= \""+now+"\"";
+          String select="uid,title_fr,description_fr,conditions_fr,keywords_fr,image,imagecredits,thumbnail,canonicalurl,firstdate_begin,lastdate_begin,lastdate_end,location_name,location_city,location_address,originagenda_title,timings,updatedat";
           String endpoint="https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/evenements-publics-openagenda/records"
-             +"?where="+java.net.URLEncoder.encode(where,"UTF-8")+"&order_by=firstdate_begin%20ASC&limit=100";
+             +"?where="+java.net.URLEncoder.encode(where,"UTF-8")
+             +"&select="+java.net.URLEncoder.encode(select,"UTF-8")
+             +"&order_by=lastdate_end%20ASC&limit=50";
           int total=0;
-          for(int offset=0;offset<600;offset+=100){
+          for(int offset=0;offset<1500;offset+=50){
             String response=getString(endpoint+"&offset="+offset);
             JSONObject page=new JSONObject(response);
             JSONArray rows=page.optJSONArray("results");
             if(rows==null)throw new java.io.IOException("OpenAgenda response has no results");
             total=page.optInt("total_count",0);
-            for(int i=0;i<rows.length();i++)events.put(rows.getJSONObject(i));
-            if(rows.length()<100)break;
+            for(int i=0;i<rows.length();i++){
+              JSONObject item=rows.getJSONObject(i);
+              String intervals=item.optString("timings","");
+              try{
+                if(intervals.startsWith("[")){
+                  JSONArray times=new JSONArray(intervals);
+                  String soonest=null,soonestEnd=null;
+                  java.time.Instant threshold=java.time.Instant.now().minusSeconds(300);
+                  for(int j=0;j<times.length();j++){
+                    JSONObject slot=times.optJSONObject(j);
+                    if(slot==null)continue;
+                    String begin=slot.optString("begin",""),finish=slot.optString("end","");
+                    if(begin.length()<19||finish.length()<19)continue;
+                    try{
+                      if(java.time.OffsetDateTime.parse(finish).toInstant().isBefore(threshold))continue;
+                      if(soonest==null||java.time.OffsetDateTime.parse(begin).toInstant().isBefore(java.time.OffsetDateTime.parse(soonest).toInstant())){
+                        soonest=begin;soonestEnd=finish;
+                      }
+                    }catch(Exception ignored){}
+                  }
+                  if(soonest!=null){item.put("display_start",soonest);item.put("display_end",soonestEnd);}
+                }
+              }catch(Exception ignored){}
+              item.remove("timings");
+              events.put(item);
+            }
+            if(rows.length()<50)break;
           }
           combined.put("results",events);
           combined.put("total_count",total);
