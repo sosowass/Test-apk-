@@ -1,0 +1,79 @@
+name: Ô31 V10 – targeted Wikimedia location photo candidates
+on:
+  push:
+    branches: [o31-hotel-v10-media]
+    paths: ['.github/workflows/o31-v10-photo-candidates.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wikimedia Commons matching photographic candidates
+        shell: bash
+        run: |
+          set -e
+          python3 -m pip install -q Pillow requests
+          mkdir -p candidates
+          cat > /tmp/search.py <<'PY'
+          import requests,json,os,re,html,io
+          from PIL import Image,ImageOps
+          from pathlib import Path
+          Q={
+            'abattoirs':'Musée des Abattoirs Toulouse bâtiment',
+            'savoirs':'Quai des Savoirs Toulouse façade musée',
+            'espace':'Cité de espace Toulouse musée fusée',
+            'pionniers':'Envol des Pionniers Toulouse musée',
+            'halle':'Halle de la Machine Toulouse minotaure',
+            'grand-rond':'Jardin Grand Rond Toulouse fontaine',
+            'carmes':'Marché des Carmes Toulouse place marché',
+            'victor-hugo':'Marché Victor Hugo Toulouse',
+            'saint-etienne':'Quartier Saint-Étienne Toulouse place',
+            'canal':'Canal du Midi Toulouse canal bateaux',
+            'museum':'Muséum Toulouse bâtiment jardin',
+            'daurade':'Quai de la Daurade Toulouse vue Garonne'
+          }
+          sess=requests.Session();sess.headers['User-Agent']='O31LanguedocEducationalTravelTV/1.0 (https://o31languedoc.com)'
+          files={}
+          for key,query in Q.items():
+            try:
+              r=sess.get('https://commons.wikimedia.org/w/api.php',params={'action':'query','format':'json','generator':'search','gsrsearch':query,'gsrnamespace':6,'gsrlimit':16,'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':800},timeout=18)
+              r.raise_for_status()
+              entries=list(r.json().get('query',{}).get('pages',{}).values())
+              entries.sort(key=lambda x:x.get('index',999))
+              rank=0
+              for p in entries:
+                ii=p.get('imageinfo',[None])[0]
+                if not ii:continue
+                title=p['title'];met=ii.get('extmetadata',{})
+                lic=html.unescape(re.sub('<[^>]+>','',met.get('LicenseShortName',{}).get('value','')))
+                author=html.unescape(re.sub('<[^>]+>','',met.get('Artist',{}).get('value','')))[:170]
+                if not re.search('CC BY|CC0|Public domain|PD-|PDM|GFDL',lic,re.I):continue
+                if not re.search('\\.(jpg|jpeg|png|webp)$',title,re.I):continue
+                if re.search('logo|diagram|map|plan|carte|blason|flag|illustration|panneau|affiche',title,re.I):continue
+                source=ii.get('thumburl') or ii.get('url')
+                try:
+                  i=sess.get(source,timeout=12);i.raise_for_status()
+                  im=Image.open(io.BytesIO(i.content));im=ImageOps.exif_transpose(im).convert('RGB')
+                  if im.width<400 or im.height<200:continue
+                  im.thumbnail((800,600))
+                  im.save('candidates/'+key+'_'+str(rank)+'.webp','WEBP',quality=78)
+                  files[key+'_'+str(rank)]={'title':title,'license':lic,'author':author,'filepage':ii.get('descriptionurl')}
+                  print('OK',key,rank,title,im.size,lic,flush=True)
+                  rank+=1
+                  if rank>=4:break
+                except Exception as e:print('IMAGEERR',key,str(e)[:60],flush=True)
+              if rank==0:print('NO_PHOTOS',key,flush=True)
+            except Exception as e:print('SEARCHERR',key,str(e)[:150],flush=True)
+          Path('candidates/credits.json').write_text(json.dumps(files,ensure_ascii=False,indent=2),encoding='utf8')
+          print('DONE',len(files),flush=True)
+          PY
+          python3 /tmp/search.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-V10-location-photo-candidates
+          path: candidates/
+          retention-days: 7
