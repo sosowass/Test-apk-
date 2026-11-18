@@ -1,0 +1,56 @@
+name: Ô31 V10 – verified landmark photographs
+on:
+  push:
+    branches: [o31-hotel-v10-media]
+    paths: ['.github/workflows/o31-v10-specific-files.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch explicitly named Wikimedia Commons photos
+        run: |
+          set -e
+          python3 -m pip install -q requests Pillow
+          mkdir -p verified
+          cat > /tmp/fetch.py <<'PY'
+          import requests,json,io,html,re
+          from pathlib import Path
+          from PIL import Image
+          names={
+           'abattoirs':"Les abattoirs - Musée d'art moderne de Toulouse.jpg",
+           'savoirs':'Université de Toulouse.jpg',
+           'espace':"Cité de l'espace Toulouse 2.jpg",
+           'museum':'Intérieur Museum Toulouse.jpg',
+           'carmes':'Rue des Prêtres vue de la place des Carmes (Toulouse).jpg',
+           'canal':'Canal du Midi Toulouse.jpg',
+          }
+          s=requests.Session();s.headers['User-Agent']='O31TourismPhotographs/1.0 (https://o31languedoc.com)'
+          credits={}
+          for key,name in names.items():
+            try:
+              params={'action':'query','format':'json','prop':'imageinfo','titles':'File:'+name,'iiprop':'url|extmetadata','iiurlwidth':960}
+              r=s.get('https://commons.wikimedia.org/w/api.php',params=params,timeout=13).json()
+              page=list(r['query']['pages'].values())[0];inf=page['imageinfo'][0];meta=inf.get('extmetadata',{})
+              lic=html.unescape(re.sub('<[^>]+>','',meta.get('LicenseShortName',{}).get('value','')))
+              author=html.unescape(re.sub('<[^>]+>','',meta.get('Artist',{}).get('value','')))[:160]
+              if not re.search('CC BY|CC0|Public domain|PD-|PDM|GFDL',lic,re.I):raise ValueError('License not reusable: '+lic)
+              data=s.get(inf.get('thumburl') or inf['url'],timeout=16);data.raise_for_status()
+              img=Image.open(io.BytesIO(data.content)).convert('RGB');img.thumbnail((1000,780))
+              if min(img.size)<250:raise ValueError('small')
+              img.save('verified/'+key+'.webp','WEBP',quality=86)
+              credits[key]={'file':key+'.webp','title':page.get('title'),'license':lic,'author':author,'link':inf.get('descriptionurl'),'file_name':name}
+              print('OK',key,img.size,lic,flush=True)
+            except Exception as e:print('SKIP',key,str(e)[:190],flush=True)
+          Path('verified/credits.json').write_text(json.dumps(credits,indent=2,ensure_ascii=False),encoding='utf8')
+          PY
+          python3 /tmp/fetch.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-V10-verified-specific-photographs
+          path: verified/
+          retention-days: 7
