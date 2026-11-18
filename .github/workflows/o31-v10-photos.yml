@@ -1,0 +1,81 @@
+name: Ô31 V10 - Authentic Toulouse Landmark Photo Research
+on:
+  push:
+    branches: [o31-v10-photo-research]
+    paths: ['.github/workflows/o31-v10-photos.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  photos:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download photo references from Wikimedia encyclopedia pages
+        run: |
+          python3 -m pip install -q requests pillow
+          mkdir -p export
+          cat > /tmp/get_photos.py <<'PY'
+          import requests,json,time,io,re
+          from PIL import Image,ImageOps,ImageDraw
+          from pathlib import Path
+          titles={
+          'capitole':'Capitole de Toulouse',
+          'sernin':'Basilique Saint-Sernin de Toulouse',
+          'jacobins':'Couvent des Jacobins de Toulouse',
+          'assezat':"Hôtel d'Assézat",
+          'etienne':'Cathédrale Saint-Étienne de Toulouse',
+          'pontneuf':'Pont Neuf (Toulouse)',
+          'augustins':'Musée des Augustins de Toulouse',
+          'saint-raymond':'Musée Saint-Raymond',
+          'bemberg':'Fondation Bemberg',
+          'abattoirs':'Les Abattoirs (musée)',
+          'museum':'Muséum de Toulouse',
+          'quai':'Quai des Savoirs',
+          'paul-dupuy':'Musée Paul-Dupuy',
+          'espace':"Cité de l'espace",
+          'aeroscopia':'Aeroscopia',
+          'pionniers':"L'Envol des pionniers",
+          'airbus':'Airbus',
+          'halle':'Halle de la Machine',
+          'plantes':'Jardin des Plantes de Toulouse',
+          'japonais':'Jardin japonais Pierre-Baudis',
+          'grand-rond':'Jardin du Grand Rond',
+          'canal':'Canal du Midi',
+          'daurade':'Quai de la Daurade',
+          'prairie':'Prairie des Filtres',
+          'carmes':'Marché des Carmes',
+          'victor-hugo':'Marché Victor-Hugo (Toulouse)',
+          'saint-etienne':'Quartier Saint-Étienne (Toulouse)'
+          }
+          S=requests.Session();S.headers.update({'User-Agent':'O31LanguedocTV/10.0 (educational tourism guide; mediaresearch@example.org)','Accept':'application/json'})
+          meta={}
+          for key,title in titles.items():
+            try:
+              # Search the encyclopedia for a topical page, and request its associated lead photograph.
+              url='https://fr.wikipedia.org/w/api.php'
+              params={'action':'query','generator':'search','gsrsearch':'intitle:'+title,'gsrlimit':3,'prop':'pageimages','piprop':'thumbnail|name','pithumbsize':1000,'format':'json'}
+              res=S.get(url,params=params,timeout=18);res.raise_for_status()
+              pages=list(res.json().get('query',{}).get('pages',{}).values())
+              pages=sorted(pages,key=lambda p:(title.casefold()!=p.get('title','').casefold(),p.get('index',999)))
+              hit=next((x for x in pages if x.get('thumbnail')),None)
+              if not hit:raise RuntimeError('no thumbnail for wikipedia page '+str([x.get('title') for x in pages]))
+              src=hit['thumbnail']['source']
+              raw=S.get(src,timeout=20);raw.raise_for_status()
+              im=Image.open(io.BytesIO(raw.content)).convert('RGB')
+              if im.width<240 or im.height<160:raise RuntimeError('tiny image')
+              im.thumbnail((1000,700))
+              im.save('export/landmark_'+key+'.webp','WEBP',quality=83)
+              meta[key]={'title':hit.get('title'),'image_source':src,'file':hit.get('pageimage'),'attribution_page':'https://fr.wikipedia.org/wiki/'+hit.get('title','').replace(' ','_'),'image_license':'Review source image metadata before any commercial reuse'}
+              print('OK',key,hit.get('title'),im.size,src[:125],flush=True)
+            except Exception as exc:
+              print('NO',key,type(exc).__name__,str(exc)[:140],flush=True)
+          Path('export/attribution_research.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2))
+          print('TOTAL',len(meta),flush=True)
+          PY
+          python3 /tmp/get_photos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: o31-v10-wikipedia-landmark-images
+          path: export/
+          retention-days: 5
