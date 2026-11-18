@@ -1,0 +1,62 @@
+name: Ô31 V10 - Additional Toulouse Photo Candidates
+on:
+  push:
+    branches: [o31-v10-photo-research]
+    paths: ['.github/workflows/o31-v10-photo-candidates.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Research candidate open-licensed landmark photos
+        run: |
+          python3 -m pip install -q requests pillow
+          mkdir -p export
+          cat >/tmp/other.py <<'PY'
+          import requests,json,time,io,html,re,os
+          from PIL import Image
+          s=requests.Session();s.headers.update({'User-Agent':'O31LanguedocTourismTV/10 (photographs of actual local places; contact o31languedoc.com)'})
+          queries={
+          'museum':'Muséum de Toulouse batiment',
+          'quai':'Quai des Savoirs Toulouse',
+          'espace':"Cité de l espace Toulouse Ariane",
+          'carmes':'Marché des Carmes Toulouse',
+          'daurade':'Quai de la Daurade Toulouse',
+          'victor-hugo':'Marché Victor Hugo Toulouse'}
+          chosen={}
+          for key,q in queries.items():
+           try:
+            args={'action':'query','generator':'search','gsrnamespace':6,'gsrsearch':q,'gsrlimit':8,'prop':'imageinfo','iiprop':'extmetadata|url','iiurlwidth':850,'format':'json','formatversion':'2'}
+            r=s.get('https://commons.wikimedia.org/w/api.php',params=args,timeout=35)
+            if r.status_code==429:time.sleep(25);r=s.get('https://commons.wikimedia.org/w/api.php',params=args,timeout=35)
+            r.raise_for_status();pages=sorted(r.json()['query']['pages'],key=lambda x:x.get('index',999))
+            for rank,p in enumerate(pages):
+             if rank>5:break
+             i=(p.get('imageinfo') or [{}])[0];e=i.get('extmetadata',{})
+             lic=e.get('LicenseShortName',{}).get('value','')
+             if not any(x in lic.lower() for x in ('cc by','cc-by','cc0','public domain','pd-')):continue
+             link=i.get('thumburl');name=p.get('title','').removeprefix('File:')
+             if not link:continue
+             try:
+              resp=s.get(link,timeout=25);resp.raise_for_status()
+              im=Image.open(io.BytesIO(resp.content)).convert('RGB')
+              if im.width<300 or im.height<170:continue
+              im.thumbnail((900,660))
+              im.save(f'export/alt_{key}_{rank}.webp','WEBP',quality=83)
+              author=html.unescape(re.sub(r'<[^>]+>',' ',e.get('Artist',{}).get('value','')))
+              chosen[f'alt_{key}_{rank}']={'title':name,'license':lic,'author':author.strip()[:140],'source':i.get('descriptionurl','')}
+              print('ALT',key,rank,name,lic,flush=True)
+             except Exception as ex:print('IMAGE_FAIL',key,rank,str(ex)[:90],flush=True)
+            time.sleep(1.2)
+           except Exception as ex: print('QUERY_FAIL',key,str(ex)[:130],flush=True)
+          open('export/alternate_credits.json','w').write(json.dumps(chosen,ensure_ascii=False,indent=2))
+          print('TOTAL',len(chosen),flush=True)
+          PY
+          python3 /tmp/other.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: o31-v10-alternate-landmark-images
+          path: export/
