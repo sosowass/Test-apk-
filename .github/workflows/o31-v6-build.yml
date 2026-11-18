@@ -1,0 +1,60 @@
+name: O31 V6 Android base and signing tools
+on:
+  push:
+    branches: [o31-hotel-v6]
+    paths: ['.github/workflows/o31-v6-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-base:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install build tools
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Patch V6 app baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 hotel3/tools/patch_v4.py
+          python3 hotel3/tools/patch_v5.py
+          sed -i "s/applicationId 'com.o31languedoc.hotel.v5'/applicationId 'com.o31languedoc.hotel.v6'/" hotel3/app/build.gradle
+          sed -i "s/versionCode 5/versionCode 6/" hotel3/app/build.gradle
+          sed -i "s/versionName '5.0-premium-agenda'/versionName '6.0-premium-suite'/" hotel3/app/build.gradle
+          sed -i 's/Ô31 Languedoc Hôtel V5/Ô31 Languedoc Hôtel V6/' hotel3/app/src/main/AndroidManifest.xml
+          grep -q "hotel.v6" hotel3/app/build.gradle
+          node --check hotel3/app/src/main/assets/app.js
+      - name: Build Android base (assets to be completed locally)
+        run: gradle -p hotel3 --no-daemon :app:assembleDebug
+      - name: Verify APK and gather official signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=hotel3/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t "$apk" | tail -1
+          mkdir -p export/v6-tools
+          cp "$apk" export/O31_V6_Android_base.apk
+          bt="$ANDROID_HOME/build-tools/35.0.0"
+          cp "$bt/zipalign" export/v6-tools/
+          cp "$bt/lib/apksigner.jar" export/v6-tools/
+          chmod +x export/v6-tools/zipalign
+          ls -lh export/O31_V6_Android_base.apk export/v6-tools/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-V6-base-and-signing-tools
+          path: export/
+          retention-days: 7
