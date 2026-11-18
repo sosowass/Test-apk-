@@ -1,0 +1,108 @@
+name: Ô31 V10 – real location photographs
+on:
+  push:
+    branches: [o31-hotel-v10-media]
+    paths: ['.github/workflows/o31-v10-photos.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  photos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Acquire matching Wikimedia photographs and license metadata
+        shell: bash
+        run: |
+          set -e
+          python3 -m pip install -q Pillow requests
+          mkdir -p o31_location_photos
+          cat > /tmp/photos.py <<'PY'
+          import requests,json,time,html,os,io,re
+          from PIL import Image,ImageOps
+          from pathlib import Path
+          out=Path('o31_location_photos')
+          P={
+           'capitole':['Place du Capitole (Toulouse)','Capitole de Toulouse'],
+           'sernin':['Basilique Saint-Sernin de Toulouse'],
+           'jacobins':['Couvent des Jacobins de Toulouse','Couvent des Jacobins (Toulouse)'],
+           'assezat':["Hôtel d'Assézat"],
+           'etienne':['Cathédrale Saint-Étienne de Toulouse'],
+           'pontneuf':['Pont-Neuf (Toulouse)'],
+           'augustins':['Musée des Augustins de Toulouse','Musée des Augustins'],
+           'saint-raymond':['Musée Saint-Raymond'],
+           'bemberg':['Fondation Bemberg'],
+           'abattoirs':['Les Abattoirs (musée)'],
+           'museum':['Muséum de Toulouse'],
+           'savoirs':['Quai des Savoirs'],
+           'paul-dupuy':['Musée Paul-Dupuy'],
+           'espace':["Cité de l'espace"],
+           'aeroscopia':['Aeroscopia'],
+           'pionniers':["L'Envol des Pionniers"],
+           'airbus':['Airbus'],
+           'halle':['Halle de la Machine'],
+           'plantes':['Jardin des plantes de Toulouse'],
+           'japonais':['Jardin japonais de Toulouse','Jardin japonais Pierre-Baudis'],
+           'grand-rond':['Jardin du Grand Rond'],
+           'canal':['Canal du Midi'],
+           'daurade':['Quai de la Daurade'],
+           'prairie':['Prairie des Filtres'],
+           'carmes':['Marché des Carmes (Toulouse)'],
+           'victor-hugo':['Marché Victor-Hugo (Toulouse)'],
+           'saint-etienne':['Quartier Saint-Étienne (Toulouse)']
+          }
+          ses=requests.Session();ses.headers.update({'User-Agent':'O31LanguedocLocationPhotos/1.0 (https://o31languedoc.com; Wikimedia reuse project)'})
+          def api(host,params):
+            return ses.get('https://'+host+'/w/api.php',params={'format':'json',**params},timeout=15).json()
+          def find_image(terms):
+            for t in terms:
+              for wiki in ['fr.wikipedia.org','en.wikipedia.org']:
+                try:
+                  j=api(wiki,{'action':'query','prop':'pageimages','titles':t,'piprop':'thumbnail|name','pithumbsize':'900','redirects':'1'})
+                  p=list(j['query']['pages'].values())[0]
+                  if 'thumbnail' in p and 'pageimage' in p:
+                    return {'title':p['title'],'file':p['pageimage'],'thumb':p['thumbnail']['source'],'wiki':wiki}
+                except Exception as e:print('wiki err',wiki,t,str(e)[:70],flush=True)
+            return None
+          def license_check(file):
+            try:
+              q=api('commons.wikimedia.org',{'action':'query','prop':'imageinfo','titles':'File:'+file,'iiprop':'url|extmetadata|user','iiurlwidth':'900'})
+              p=list(q['query']['pages'].values())[0]
+              inf=p['imageinfo'][0]; meta=inf.get('extmetadata',{})
+              lic=html.unescape(re.sub('<[^>]+>','',meta.get('LicenseShortName',{}).get('value',''))).strip()
+              author=html.unescape(re.sub('<[^>]+>','',meta.get('Artist',{}).get('value',''))).strip()
+              link=inf.get('descriptionurl','https://commons.wikimedia.org/wiki/File:'+file.replace(' ','_'))
+              thumb=inf.get('thumburl') or inf.get('url')
+              okay=bool(re.search('CC BY|CC0|Public domain|PD-|PDM|CC-BY|GFDL',lic,re.I))
+              return (okay,lic,author[:220],link,thumb)
+            except Exception as e:print('license err',file,str(e)[:95],flush=True)
+            return (False,'','','','')
+          metadata={}
+          for key,titles in P.items():
+            result=find_image(titles)
+            if not result:
+              print('NO_MATCH',key,titles,flush=True);continue
+            okay,lic,author,link,thumb=license_check(result['file'])
+            if not okay:
+              print('LICENSE_SKIP',key,lic,result['file'],flush=True);continue
+            try:
+              data=ses.get(thumb,timeout=20)
+              data.raise_for_status()
+              img=Image.open(io.BytesIO(data.content)).convert('RGB')
+              if img.width<350 or img.height<200:raise Exception('too small')
+              img=ImageOps.exif_transpose(img)
+              img.thumbnail((1080,750),Image.Resampling.LANCZOS)
+              img.save(out/(key+'.webp'),quality=84,method=5)
+              metadata[key]={'file':key+'.webp','title':result['title'],'license':lic,'author':author,'link':link,'file_name':result['file']}
+              print('OK',key,result['title'],img.size,lic,author[:65],flush=True)
+            except Exception as e:print('IMAGE_ERROR',key,str(e)[:100],flush=True)
+          (out/'credits.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('TOTAL',len(metadata),'/',len(P),flush=True)
+          PY
+          python3 /tmp/photos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-V10-real-location-photos
+          path: o31_location_photos/
+          retention-days: 7
