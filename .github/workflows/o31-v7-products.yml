@@ -14,6 +14,7 @@ jobs:
       - name: Download standalone appliance product reference photographs
         run: |
           set -euo pipefail
+          python3 -m pip install -q Pillow
           mkdir -p product_reference
           python3 - <<'PY'
           import urllib.request
