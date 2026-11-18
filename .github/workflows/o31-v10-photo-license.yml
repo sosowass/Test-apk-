@@ -1,0 +1,104 @@
+name: Ô31 V10 - Verify Wikimedia licences and alternate real site photos
+on:
+  push:
+    branches: [o31-v10-photo-research]
+    paths: ['.github/workflows/o31-v10-photo-license.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  licensing:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect Wikimedia photo licensing and alternative landmark candidates
+        run: |
+          python3 -m pip install -q requests pillow
+          mkdir -p export
+          cat > /tmp/license.py <<'PY'
+          import requests,json,io,re,html,time,os
+          from PIL import Image
+          from pathlib import Path
+          S=requests.Session();S.headers.update({'User-Agent':'O31LanguedocTourismTV/10 (tourism photos attribution contact o31languedoc.com)','Accept':'application/json'})
+          api='https://commons.wikimedia.org/w/api.php'
+          files={
+          'capitole':'Toulouse_Capitole_Night_Wikimedia_Commons.jpg',
+          'sernin':'Basilique_Saint-Sernin_de_Toulouse_-_exposition_ouest-1-.jpg',
+          'jacobins':'Couvent_des_Jacobins_de_Toulouse.jpg',
+          'assezat':"Bachelier_-_Hôtel_d'Assézat_-_Toulouse.jpg",
+          'etienne':'Façade_de_la_cathédrale_Saint-Étienne_de_Toulouse.jpg',
+          'pontneuf':'Le_Pont-Neuf_de_Toulouse.jpg',
+          'augustins':"Musée_des_Augustin,_l'aile_Darcy_-_Viollet-le-duc.jpg",
+          'saint-raymond':'Musée_Saint-Raymond_-_Toulouse.jpg',
+          'abattoirs':"Les_abattoirs_-_Musée_d'art_moderne_de_Toulouse.jpg",
+          'paul-dupuy':'Le_Musée_Paul_Dupuy.jpg',
+          'aeroscopia':'Aeroscopia_Blagnac.jpg',
+          'pionniers':'Envol_des_pionniers.jpg',
+          'airbus':'Airbus_Lagardère_-_Aéroconstellation.jpg',
+          'halle':'Minotaure.jpg',
+          'plantes':"(Toulouse)_'La_Femme_au_paon'_by_Falguière,_'Jardin_des_Plantes'.jpg",
+          'japonais':'Lac_et_pavillon_du_thé.jpg',
+          'grand-rond':'Grand_Rond_(jardin).jpg',
+          'canal':'Canal_du_Midi_aug_2011.jpg',
+          'prairie':'Toulouse_pairie_des_filtres.jpg',
+          'victor-hugo':'Marchevictorhugo.JPG',
+          'saint-etienne':'Rue_des_Arts_(Toulouse).jpg'
+          }
+          # Existing files may have exact spelling differences; resolve query search automatically.
+          alternates={
+           'espace':'Cité de l espace Toulouse fusée Ariane',
+           'museum':'Muséum Toulouse jardin botanique bâtiment',
+           'quai':'Quai des Savoirs Toulouse musée',
+           'carmes':'Marché des Carmes Toulouse marché',
+           'daurade':'Quai de la Daurade Toulouse',
+           'victor-hugo':'Marché Victor Hugo Toulouse',
+           'bemberg':'Collection Bemberg intérieur Toulouse',
+           'canal':'Canal du Midi Toulouse',
+          }
+          allowed=['cc-by','cc by','cc0','public domain','domaine public','pd-','publicdomain','cc-by-sa']
+          report={}
+          def meta(file):
+            args={'action':'query','titles':'File:'+file,'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':'900','format':'json'}
+            r=S.get(api,params=args,timeout=22);r.raise_for_status()
+            o=list(r.json().get('query',{}).get('pages',{}).values())[0]
+            inf=(o.get('imageinfo') or [{}])[0]
+            ext=inf.get('extmetadata',{})
+            license=html.unescape(re.sub(r'<[^>]+>',' ',ext.get('LicenseShortName',{}).get('value','')))
+            author=html.unescape(re.sub(r'<[^>]+>',' ',ext.get('Artist',{}).get('value','')))
+            return {'file':file,'license':license,'artist':re.sub(r'\\s+',' ',author)[:200],'source':inf.get('descriptionurl',''),'thumb':inf.get('thumburl',inf.get('url',''))}
+          for key,file in files.items():
+            try:
+              d=meta(file);report[key]=d
+              print('LICENSE',key,d['license'],d['artist'][:60],flush=True)
+            except Exception as e:
+              print('UNKNOWN',key,str(e)[:150],flush=True)
+          Path('export/licences.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
+          for key,q in alternates.items():
+            try:
+              p={'action':'query','generator':'search','gsrnamespace':6,'gsrsearch':q+' filetype:bitmap','gsrlimit':6,'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':'700','format':'json'}
+              rr=S.get(api,params=p,timeout=25);rr.raise_for_status()
+              pages=sorted(rr.json().get('query',{}).get('pages',{}).values(),key=lambda x:x.get('index',999))
+              for i,p in enumerate(pages):
+                file=p.get('title','').removeprefix('File:')
+                inf=(p.get('imageinfo') or [{}])[0]
+                if not inf.get('thumburl'):continue
+                ext=inf.get('extmetadata',{})
+                license=ext.get('LicenseShortName',{}).get('value','')
+                if not any(x in license.lower() for x in allowed):continue
+                raw=S.get(inf['thumburl'],timeout=18);raw.raise_for_status()
+                image=Image.open(io.BytesIO(raw.content)).convert('RGB');image.thumbnail((700,500))
+                image.save(f'export/alternate_{key}_{i}.webp','WEBP',quality=80)
+                d={'key':key,'file':file,'license':license,
+                   'artist':re.sub(r'<[^>]+>',' ',ext.get('Artist',{}).get('value',''))[:140],
+                   'source':inf.get('descriptionurl','')}
+                report[f'alternate_{key}_{i}']=d
+                print('ALT',key,i,file,license,flush=True)
+            except Exception as e: print('ALT_FAILED',key,str(e)[:130],flush=True)
+          Path('export/licences.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
+          PY
+          python3 /tmp/license.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: o31-v10-verified-commons-licenses-and-alternatives
+          path: export/
+          retention-days: 5
