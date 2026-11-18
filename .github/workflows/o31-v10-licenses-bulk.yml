@@ -1,0 +1,74 @@
+name: Ô31 V10 - Bulk Wikimedia Photo Licence Verification
+on:
+  push:
+    branches: [o31-v10-photo-research]
+    paths: ['.github/workflows/o31-v10-licenses-bulk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  licensing:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Commons file metadata in a single batch
+        run: |
+          python3 -m pip install -q requests
+          mkdir -p export
+          cat >/tmp/metadata.py <<'PY'
+          import requests,html,re,json
+          files={
+           'capitole':'Toulouse_Capitole_Night_Wikimedia_Commons.jpg',
+           'sernin':'Basilique_Saint-Sernin_de_Toulouse_-_exposition_ouest-1-.jpg',
+           'jacobins':'Couvent_des_Jacobins_de_Toulouse.jpg',
+           'assezat':"Bachelier_-_Hôtel_d'Assézat_-_Toulouse.jpg",
+           'bemberg':"Bachelier_-_Hôtel_d'Assézat_-_Toulouse.jpg",
+           'etienne':'Façade_de_la_cathédrale_Saint-Étienne_de_Toulouse.jpg',
+           'pontneuf':'Le_Pont-Neuf_de_Toulouse.jpg',
+           'augustins':"Musée_des_Augustin,_l'aile_Darcy_-_Viollet-le-duc.jpg",
+           'saint-raymond':'Musée_Saint-Raymond_-_Toulouse.jpg',
+           'abattoirs':"Les_abattoirs_-_Musée_d'art_moderne_de_Toulouse.jpg",
+           'paul-dupuy':'Le_Musée_Paul_Dupuy.jpg',
+           'aeroscopia':'Aeroscopia_Blagnac.jpg',
+           'pionniers':'Envol_des_pionniers.jpg',
+           'airbus':'Airbus_Lagardère_-_Aéroconstellation.jpg',
+           'halle':'Minotaure.jpg',
+           'japonais':'Lac_et_pavillon_du_thé.jpg',
+           'grand-rond':'Grand_Rond_(jardin).jpg',
+           'canal':'Canal_du_Midi_aug_2011.jpg',
+           'prairie':'Toulouse_pairie_des_filtres.jpg',
+           'victor-hugo':'Marchevictorhugo.JPG',
+           'saint-etienne':'Rue_des_Arts_(Toulouse).jpg',
+           'plantes':"(Toulouse)_'La_Femme_au_paon'_by_Falguière,_'Jardin_des_Plantes'.jpg"
+          }
+          s=requests.Session();s.headers.update({'User-Agent':'O31LanguedocTV/10 (metadata license verification; contact o31languedoc.com)'})
+          args={'action':'query','titles':'|'.join('File:'+v for v in dict.fromkeys(files.values())),
+          'prop':'imageinfo','iiprop':'extmetadata|url','format':'json','formatversion':'2'}
+          r=s.post('https://commons.wikimedia.org/w/api.php',data=args,timeout=40)
+          if r.status_code!=200:
+           r=s.get('https://commons.wikimedia.org/w/api.php',params=args,timeout=40)
+          print('HTTP',r.status_code,flush=True)
+          r.raise_for_status()
+          pages=r.json()['query']['pages']
+          found={}
+          def plain(t):return re.sub(r'\\s+',' ',html.unescape(re.sub(r'<[^>]*>',' ',t or ''))).strip()
+          for page in pages:
+           if not page.get('imageinfo'):continue
+           info=page['imageinfo'][0];e=info.get('extmetadata',{})
+           found[page['title'].lower().replace('_',' ')]={
+           'license':plain(e.get('LicenseShortName',{}).get('value','')),
+           'artist':plain(e.get('Artist',{}).get('value',''))[:180],
+           'source':info.get('descriptionurl','')
+           }
+          out={}
+          for key,v in files.items():
+           rec=found.get(('File:'+v).lower().replace('_',' '))
+           if rec:out[key]=rec
+           print('PHOTO',key,json.dumps(rec,ensure_ascii=False) if rec else 'NOT_FOUND',flush=True)
+          open('export/licences_bulk.json','w').write(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+          python3 /tmp/metadata.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: o31-v10-licensed-photo-metadata
+          path: export/
