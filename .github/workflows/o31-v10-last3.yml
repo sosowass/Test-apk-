@@ -1,0 +1,50 @@
+name: Ô31 V10 - Exact Three Remaining Toulouse Sites
+on:
+  push:
+    branches: [o31-v10-photo-research]
+    paths: ['.github/workflows/o31-v10-last3.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch three identified Commons photographs
+        run: |
+          python3 -m pip install -q requests pillow
+          mkdir -p export
+          cat >/tmp/download.py <<'PY'
+          import requests,json,io,re,html
+          from PIL import Image
+          s=requests.Session();s.headers.update({'User-Agent':'O31LanguedocTV/10 Tourism Guide (https://o31languedoc.com)'})
+          images={'museum':'Intérieur Museum Toulouse.jpg','quai':'Allée Jules-Guesde.jpg','espace':'Fusée Ariane 5 (4332428498).jpg'}
+          q={'action':'query','titles':'|'.join('File:'+v for v in images.values()),'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':1050,'format':'json','formatversion':'2'}
+          r=s.post('https://commons.wikimedia.org/w/api.php',data=q,timeout=40)
+          if r.status_code!=200:r=s.get('https://commons.wikimedia.org/w/api.php',params=q,timeout=40)
+          r.raise_for_status()
+          data={p['title']:p for p in r.json()['query']['pages']}
+          report={}
+          for k,name in images.items():
+            p=data.get('File:'+name)
+            if not p or not p.get('imageinfo'):
+              print('NO',k,name,flush=True);continue
+            i=p['imageinfo'][0];ext=i.get('extmetadata',{})
+            lic=ext.get('LicenseShortName',{}).get('value','')
+            if not any(v in lic.lower() for v in ('cc-by','cc by','cc0','public domain')):continue
+            src=i.get('thumburl',i.get('url'))
+            raw=s.get(src,timeout=30);raw.raise_for_status()
+            im=Image.open(io.BytesIO(raw.content)).convert('RGB');im.thumbnail((1000,740))
+            if im.width<220:continue
+            im.save('export/landmark_'+k+'.webp','WEBP',quality=85)
+            author=html.unescape(re.sub(r'<[^>]+>',' ',ext.get('Artist',{}).get('value',''))).strip()
+            report[k]={'author':author,'license':lic,'source':i.get('descriptionurl',''),'attribution':'© '+author+' · '+lic+' · Wikimedia Commons'}
+            print('OK',k,im.size,lic,author,flush=True)
+          open('export/credits.json','w').write(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+          python3 /tmp/download.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: o31-v10-three-remaining-genuine-site-photos
+          path: export/
