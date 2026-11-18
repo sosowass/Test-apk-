@@ -1,0 +1,51 @@
+name: O31 V7 – Manufacturer Equipment Reference Photos
+on:
+  push:
+    branches: [o31-hotel-v7]
+    paths: ['.github/workflows/o31-v7-products.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download standalone appliance product reference photographs
+        run: |
+          set -euo pipefail
+          mkdir -p product_reference
+          python3 - <<'PY'
+          import urllib.request
+          from PIL import Image
+          from io import BytesIO
+          from pathlib import Path
+          import os
+          refs={
+            'oven':('https://dispatche.com/wp-content/uploads/four-pyrolyse-whirlpool-akz96490nb-8027016-2502280998_80998_1200x1200-1.png','Whirlpool AKZ96490NB'),
+            'microwave':('https://whirlpool.com.au/cdn/shop/files/MWP201SB_001.jpg?v=1729734903','Whirlpool MWP201SB representative Jet Start unit'),
+            'coffee':('https://www.expert.nl/cdn/resize/1500/media/frontend/catalog/products/249/372515249/1260x1260/372515249-6741595.jpg','DeLonghi Magnifica S ECAM20.110.B'),
+            'tv':('https://lcdn.altex.ro/media/catalog/product/u/h/uhdue43au7092ux_1__4625f878.jpg','Samsung Smart TV representative'),
+            'clothes':('https://cdn.manomano.com/images/images_products/33585902/P/129633270_1.jpg','Retractable wall mounted clothesline representative'),
+            'ac':('https://www.mitsubishielectric.com.hk/uploads/product/MSY-GS12VF_645_1.jpg','Mitsubishi Electric wall AC representative')
+          }
+          for k,(u,caption) in refs.items():
+            try:
+              req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125 Safari/537.36'})
+              data=urllib.request.urlopen(req,timeout=18).read()
+              im=Image.open(BytesIO(data)).convert('RGB')
+              if min(im.size)<150: raise ValueError('image too small')
+              im.thumbnail((900,760))
+              dest=Path('product_reference')/(k+'.webp')
+              im.save(dest,'WEBP',quality=86)
+              print(k,im.size,len(data),caption,flush=True)
+            except Exception as e:
+              print(k,'UNAVAILABLE',str(e)[:180],flush=True)
+          PY
+          echo 'Downloaded images:'
+          ls -lh product_reference/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: O31-V7-manufacturer-reference-photos
+          path: product_reference/
+          retention-days: 7
