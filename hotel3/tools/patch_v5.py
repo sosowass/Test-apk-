@@ -272,6 +272,7 @@ css=css_path.read_text()+"""
 css_path.write_text(css)
 
 java=java_path.read_text()
+java=replace_once(java,'if(buf.size()>900000)','if(buf.size()>6000000)','larger OpenAgenda response budget')
 native_start="  @JavascriptInterface public void fetch(String type){"
 start=java.find(native_start)
 end=java.find("\n }\n}",start)
